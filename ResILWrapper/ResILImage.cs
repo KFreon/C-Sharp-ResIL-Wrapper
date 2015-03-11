@@ -25,35 +25,13 @@ namespace ResILWrapper
         #region Image Properties
         public string Path { get; private set; }
         public CompressedDataFormat SurfaceFormat { get; private set; }
-        public string SurfaceFormatString
-        {
-            get
-            {
-                string form = Enum.GetName(typeof(CompressedDataFormat), SurfaceFormat);
-                return form == "None" ? System.IO.Path.GetExtension(Path) : form;
-            }
-        }
         public int Width { get; private set; }
         public int Height { get; private set; }
         public int BitsPerPixel { get; private set; }
         public DataFormat MemoryFormat { get; private set; }  // KFreon: Format as loaded by ResIL
-        public string MemoryFormatString
-        {
-            get
-            {
-                return Enum.GetName(typeof(DataFormat), MemoryFormat);
-            }
-        }
         public int Channels { get; private set; }
         public int DataSize { get; private set; }
         public DataType DataType { get; private set; }
-        public string DataTypeString
-        {
-            get
-            {
-                return Enum.GetName(typeof(DataType), DataType);
-            }
-        }
         private bool isV8U8
         {
             get
@@ -106,8 +84,17 @@ namespace ResILWrapper
 
         public ResILImage(byte[] imgData, ImageType type = ImageType.Bmp)
         {
+            // KFreon: Attempt to determine type unless provided
+            ImageType GivenType = type;
+
+            if (type == ImageType.Bmp)
+                GivenType = IL2.DetermineImageType(imgData);
+
+            if (type == ImageType.Unknown)
+                GivenType = type;
+
             Path = null;
-            LoadImage(imgData, type);
+            LoadImage(imgData, GivenType);
             PopulateInfo();
         }
         
@@ -118,6 +105,7 @@ namespace ResILWrapper
         public unsafe void PopulateInfo()
         {
             // KFreon: Pointer to ILImage struct
+            //uint* BasePointer = (uint*)handle.ToPointer();
             uint* BasePointer = (uint*)handle.ToPointer();
 
             // KFreon: Get information and count mipmaps (recursive rubbish)
@@ -134,85 +122,101 @@ namespace ResILWrapper
         private unsafe int CountMipsAndGetDetails(uint* BasePointer, bool toplevel = true)
         {
             int mipcount = 1;
-            byte* BytePtr = (byte*)BasePointer; 
 
             // KFreon: Read image dimensions
-            int W = (int)*(BasePointer++);
-            int H = (int)*(BasePointer++);
-            BasePointer++;  // KFreon: Ignore depth
+            int W = (int)*BasePointer++;
+            int H = (int)*BasePointer++;
+            int Depth = (int)*BasePointer++;
 
-            // KFreon: Move to byte*
-            BytePtr = (byte*)BasePointer;
 
-            // KFreon: Read Bits per pixel and number of channels
-            int BPP = *(BytePtr++);
-            int Chan = *(BytePtr++);
+            // KFreon: Go to byte* land.
+            byte* bytePtr = (byte*)BasePointer;
+            uint BPP = *bytePtr++;
+            int BitsPerChannel = *bytePtr++;
+            bytePtr+=2;  // KFreon: Fix alignment
 
-            BytePtr += 2; // KFreon: Skip data 
+            // KFreon: Go back to uint* land.
+            BasePointer = (uint*)bytePtr;
+            uint BitsPerPScanLine = (uint)*BasePointer++;
 
-            // KFreon: I am aware I could stay in byte* land to skip the following, but I wanted to keep some structure so I know what's going on.
+            if (IntPtr.Size == 8)  // KFreon: x64 alignment?
+                BasePointer++;
 
-            BasePointer = (uint*)BytePtr;   // KFreon: Back to uint*
-            BasePointer++;   // KFreon: Skip scanline stuff
+            // KFreon: Round and round the mulberry bush...
+            uint* dataPtr = (uint*) (BasePointer += (IntPtr.Size/4)); 
 
-            BytePtr = (byte*)BasePointer;  // KFreon: To byte*
-            BytePtr += 12;  // KFreon: Skip bunches of stuff
+            int datasize = (int)*BasePointer++;
+            int PlaneSize = (int)*BasePointer++;
+            DataFormat memform = (DataFormat)(*BasePointer++);
+            DataType datatyp = (DataType)(*BasePointer++);
+            OriginLocation origin = (OriginLocation)(*BasePointer++);
 
-            BasePointer = (uint*)BytePtr;  // KFreon: Back to uint*
+            if (IntPtr.Size == 8)  // KFreon: x64 alignment?
+                BasePointer++;
 
-            // KFreon: Read Datasize, format in memory, and type of data.
-            int datasiz = (int)*(BasePointer++);
-            BasePointer++;  // KFreon: Skip planesize
-            DataFormat memform = (DataFormat)(*(BasePointer++));
-            DataType datatyp = (DataType)(*(BasePointer++));
+            // KFreon: Skip palette
+            BasePointer += 7; // x86 = 1C, x64 = 28
 
-            // KFreon: Address before checking mips with offset for skipping everything in between
-            uint* before = BasePointer + 29;
-            BytePtr = (byte*)before;
-            BytePtr--;
-            before = (uint*)BytePtr;
+            if (IntPtr.Size == 8)  // KFreon: Alignment or no idea...
+                BasePointer += 3;
 
+            int duration = (int)*(BasePointer++);
+            CubeMapFace cubeflags = (CubeMapFace)(*BasePointer++);
 
 
             #region CHECK MIPS
-            BasePointer++;  // KFreon: Skip origin
-            BasePointer += 13; // KFreon: Skip palette
-
-
-            byte** ptr = (byte**)BasePointer;  // KFreon: Dunno if all this is necessary. I don't do pointer stuff much.
-            var th = (long*)(*ptr);
+            long* th = (long*)BasePointer;
+            th = (long*)*th;
 
             // KFreon: If there's a mip left, read it and increment mip count recursivly (Ugh...)
             if (th != (uint*)0)
                 mipcount += CountMipsAndGetDetails((uint*)th, false);
             #endregion
 
+            BasePointer++; // KFreon: Alignment?
+
+            if (IntPtr.Size == 8)  // KFreon: x64 alignment?
+                BasePointer++;
+
+            int Next = (int)*BasePointer++;
+            int Faces = (int)*BasePointer++;
+            int Layers = (int)*BasePointer++;
+            int animlist = (int)*BasePointer++;
+            int animsize = (int)*BasePointer++;
+            int profile = (int)*BasePointer++;
+            int profilesize = (int)*BasePointer++;
+            int offx = (int)*BasePointer++;
+            int offy = (int)*BasePointer++;
 
 
-            // KFreon: Reset pointer position
-            BasePointer = before;
+            // KFreon: Imma byte this pointer
+            bytePtr = (byte*)BasePointer;
+            int dxtcdataPtr = (int)*bytePtr++;
+            bytePtr += 3; // KFreon: Alignment
 
-            BasePointer += 2;  // KFreon: Ignore image offsets
-            BasePointer += 3; // KFreon: Ignore data
 
-            byte* t = (byte*)BasePointer;
-            t++;
-            BasePointer = (uint*)t;
+            // KFreon: Uint gonna byte me!
+            BasePointer = (uint*)bytePtr;
 
-            CompressedDataFormat surface = (CompressedDataFormat)(*(BasePointer++));
+            if (IntPtr.Size == 8)  // KFreon: uhh....
+                BasePointer += 8;
 
+            CompressedDataFormat surface = (CompressedDataFormat)(*BasePointer++);
+            int dxtcsize = (int)*BasePointer++;
 
             // KFreon: Set original image properties
             if (toplevel)
             {
                 Width = W;
                 Height = H;
-                BitsPerPixel = BPP;
-                Channels = Chan;
-                DataSize = datasiz;
+                BitsPerPixel = (int)BPP;
+                Channels = BitsPerChannel;
+                DataSize = datasize;
                 MemoryFormat = memform;
                 DataType = datatyp;
-                SurfaceFormat = surface;
+
+                if (SurfaceFormat != CompressedDataFormat.V8U8)
+                    SurfaceFormat = surface;
             }
 
             return mipcount;
@@ -291,7 +295,7 @@ namespace ResILWrapper
         /// <param name="type">OPTIONAL: Type of image to create. Default is JPG.</param>
         /// <param name="quality">OPTIONAL: Quality of JPG image. Valid only if type is JPG. Range 0-100. Default is 80.</param>
         /// <returns></returns>
-        public BitmapImage ToImage(ImageType type = ImageType.Jpg, int quality = 80, int width = 0)
+        public BitmapImage ToImage(ImageType type = ImageType.Jpg, int quality = 80, int width = 0, int height = 0)
         {
             byte[] data = null;
 
@@ -301,7 +305,7 @@ namespace ResILWrapper
 
             // KFreon: Save to array and build WPF bitmap.
             if (IL2.SaveToArray(handle, type, out data) != 0)
-                return UsefulThings.WPF.Images.CreateWPFBitmap(data, width);
+                return UsefulThings.WPF.Images.CreateWPFBitmap(data, width, height);
             else
             {
                 Debug.WriteLine("Saving to array failed for some reason.");

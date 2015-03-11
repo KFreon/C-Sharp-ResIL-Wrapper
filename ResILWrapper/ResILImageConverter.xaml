@@ -1,6 +1,8 @@
 ﻿<Window x:Class="ResILWrapper.ResILImageConverter"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:useful="clr-namespace:UsefulThings.WPF;assembly=UsefulThings"
+        xmlns:local="clr-namespace:ResIL.Unmanaged"
         Title="Converter" Height="538.872" Width="905.191">
     <Grid>
         <Grid.ColumnDefinitions>
@@ -10,11 +12,15 @@
             <RowDefinition/>
         </Grid.RowDefinitions>
         
+        <Grid.Resources>
+            <useful:EnumToStringConverter x:Key="EnumToStringConverter"/>
+        </Grid.Resources>
+        
         
 
         <Image x:Name="mainimage" Margin="406,10,10,31" Source="{Binding bitmap}"/>
         <Label Content="Old Format" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" FontWeight="Bold"/>
-        <Label Content="{Binding img.SurfaceFormatString}" Margin="17,34,0,0" Height="29" VerticalAlignment="Top" HorizontalAlignment="Left" Width="67"/>
+        <Label Content="{Binding img.SurfaceFormat, Converter={StaticResource EnumToStringConverter}, ConverterParameter={x:Type local:CompressedDataFormat}}" Margin="17,34,0,0" Height="29" VerticalAlignment="Top" HorizontalAlignment="Left" Width="67"/>
         <Label Content="New Format" HorizontalAlignment="Left" Margin="152,10,0,0" VerticalAlignment="Top" FontWeight="Bold"/>
         <ComboBox HorizontalAlignment="Left" Margin="152,41,0,0" VerticalAlignment="Top" Width="120" ItemsSource="{Binding Formats}" SelectedItem="{Binding SelectedFormat}" IsEnabled="{Binding isLoaded}"/>
         <Label Content="Image Path" HorizontalAlignment="Left" Margin="17,94,0,0" VerticalAlignment="Top" FontWeight="Bold"/>
@@ -61,11 +67,11 @@
             <Label Content="{Binding img.Height}"/>
             <Label Content="{Binding img.BitsPerPixel}"/>
             <Label Content="{Binding img.Channels}"/>
-            <Label Content="{Binding img.SurfaceFormatString}"/>
-            <Label Content="{Binding img.MemoryFormatString}"/>
+            <Label Content="{Binding img.SurfaceFormat, Converter={StaticResource EnumToStringConverter}, ConverterParameter={x:Type local:CompressedDataFormat}}"/>
+            <Label Content="{Binding img.MemoryFormat, Converter={StaticResource EnumToStringConverter}, ConverterParameter={x:Type local:DataFormat}}"/>
             <Label Content="{Binding img.DataSize}"/>
             <Label Content="{Binding img.Mips}"/>
-            <Label Content="{Binding img.DataTypeString}"/>
+            <Label Content="{Binding img.DataType, Converter={StaticResource EnumToStringConverter}, ConverterParameter={x:Type local:DataType}}"/>
         </StackPanel>
     </Grid>
 </Window>
