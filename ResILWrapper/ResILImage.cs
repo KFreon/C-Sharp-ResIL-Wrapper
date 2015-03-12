@@ -28,7 +28,7 @@ namespace ResILWrapper
         public int Width { get; private set; }
         public int Height { get; private set; }
         public int BitsPerPixel { get; private set; }
-        public DataFormat MemoryFormat { get; private set; }  // KFreon: Format as loaded by ResIL
+        public DataFormat MemoryFormat { get; private set; }  // KFreon: Format as loaded by ResIL (Usually RGB)
         public int Channels { get; private set; }
         public int DataSize { get; private set; }
         public DataType DataType { get; private set; }
@@ -105,7 +105,6 @@ namespace ResILWrapper
         public unsafe void PopulateInfo()
         {
             // KFreon: Pointer to ILImage struct
-            //uint* BasePointer = (uint*)handle.ToPointer();
             uint* BasePointer = (uint*)handle.ToPointer();
 
             // KFreon: Get information and count mipmaps (recursive rubbish)
@@ -114,10 +113,11 @@ namespace ResILWrapper
 
 
         /// <summary>
-        /// Reads ILImage struct and is used recursively to count mipmaps.
+        /// Reads ILImage struct information and populates relevent fields.
+        /// Recursively (ew...) counts mips. Returns number of mips.
         /// </summary>
         /// <param name="BasePointer">Pointer to ILImage struct.</param>
-        /// <param name="toplevel">OPTIONAL: True only when first called. All recursive stuff is False.</param>
+        /// <param name="toplevel">True only when first called. All recursive stuff is False.</param>
         /// <returns>Number of mipmaps.</returns>
         private unsafe int CountMipsAndGetDetails(uint* BasePointer, bool toplevel = true)
         {
@@ -215,6 +215,7 @@ namespace ResILWrapper
                 MemoryFormat = memform;
                 DataType = datatyp;
 
+                // KFreon: Trump ResIL's format reading of V8U8 (gets it wrong). It's been set previously.
                 if (SurfaceFormat != CompressedDataFormat.V8U8)
                     SurfaceFormat = surface;
             }
@@ -224,43 +225,53 @@ namespace ResILWrapper
 
 
         /// <summary>
-        /// Load image from file.
+        /// Load image from file. Returns true if successful.
         /// </summary>
         /// <param name="FilePath">Path to image file.</param>
         private bool LoadImage(string FilePath)
         {
-            bool isNormal = false;
+            bool isNormalMap = false;
 
             // KFreon: If V8U8, use correct load function.
             if (CheckIfV8U8(FilePath) == true)
             {
                 SurfaceFormat = CompressedDataFormat.V8U8;
                 LoadV8U8(FilePath);
-                isNormal = true;
+                isNormalMap = true;
             }
             else
             {
                 IL2.Settings.KeepDXTC(true);
-                IL2.LoadImage(ref handle, FilePath);
+                if (!IL2.LoadImage(ref handle, FilePath))
+                {
+                    Debug.WriteLine("Loading from file failed for some reason.");
+                    Debug.WriteLine(GET ERROR FUNCTION);
+                }
             }
-            return isNormal;
+            return isNormalMap;
         }
 
+        /// <summary>
+        /// Load image from byte[]. Returns true if successful.
+        /// </summary>
+        /// <param name="data">Data of image file, NOT raw pixel data.</param>
+        /// <param name="type">Type of data (format etc jpg, dds, etc)</param>
         private bool LoadImage(byte[] data, ImageType type = ImageType.Bmp)
         {
-            bool isNormal = false;
+            bool isNormalMap = false;
+            
             // KFreon: If V8U8, use correct load function.
             MemoryTributary stream = new MemoryTributary(data);
             if (CheckIfV8U8(data: stream) == true)
             {
                 SurfaceFormat = CompressedDataFormat.V8U8;
                 LoadV8U8(stream);
-                isNormal = true;
+                isNormalMap = true;
                 stream.Dispose();
             }
             else
             {
-                stream.Dispose();
+                stream.Dispose(); // KFreon: Don't need stream anymore
                 IL2.Settings.KeepDXTC(true);
                 if (!IL2.LoadImageFromArray(ref handle, data, type))
                 {
@@ -268,33 +279,37 @@ namespace ResILWrapper
                     Debug.WriteLine(Enum.GetName(typeof(ErrorType), IL2.GetError()));
                 }
             }
-            return isNormal;
+            return isNormalMap;
         }
 
+
+        /// <summary>
+        /// Load image from MemoryStream. Returns true if successful.
+        /// </summary>
+        /// <param name="data">Data of image file, NOT raw pixel data.</param>asf
         private bool LoadImage(MemoryTributary data)
         {
-            bool isNormal = false;
+            bool isNormalMap = false;
             // KFreon: If V8U8, use correct load function.
             if (CheckIfV8U8(data: data) == true)
             {
                 SurfaceFormat = CompressedDataFormat.V8U8;
                 LoadV8U8(data);
-                isNormal = true;
+                isNormalMap = true;
             }
             else
             {
                 IL2.Settings.KeepDXTC(true);
                 IL2.LoadImageFromStream(ref handle, data);
             }
-            return isNormal;
+            return isNormalMap;
         }
 
         /// <summary>
-        /// Converts this image to WPF bitmap.
+        /// Converts this image to WPF bitmap. Returns null on failure.
         /// </summary>
-        /// <param name="type">OPTIONAL: Type of image to create. Default is JPG.</param>
-        /// <param name="quality">OPTIONAL: Quality of JPG image. Valid only if type is JPG. Range 0-100. Default is 80.</param>
-        /// <returns></returns>
+        /// <param name="type">Type of image to create.</param>
+        /// <param name="quality">Quality of JPG image. Valid only if type is JPG. Range 0-100.</param>
         public BitmapImage ToImage(ImageType type = ImageType.Jpg, int quality = 80, int width = 0, int height = 0)
         {
             byte[] data = null;
@@ -315,10 +330,13 @@ namespace ResILWrapper
         }
 
 
+        /// <summary>
+        /// Converts instance to array of image data of a given image type.
+        /// </summary>
+        /// <param name="type">Type of image to get data of.</param>
         public byte[] ToArray(ImageType type)
         {
             byte[] data = null;
-            Debugger.Break();
             if (IL2.SaveToArray(handle, type, out data) != 0)
                 return data;
             else
@@ -405,8 +423,8 @@ namespace ResILWrapper
         /// <summary>
         /// Checks if current working image is a V8U8 NormalMap image.
         /// </summary>
-        /// <param name="file">OPTIONAL: Path to image file. DEFAULT = null, data MUST NOT be null.</param>
-        /// <param name="data">OPTIONAL: Raw image data. DEFAULT = null, file MUST NOT be null.</param>
+        /// <param name="file">Path to image file. DEFAULT = null, data MUST NOT be null.</param>
+        /// <param name="data">Raw image data. DEFAULT = null, file MUST NOT be null.</param>
         /// <returns>True if V8U8, False if not V8U8, null if invalid parameters provided.</returns>
         private static bool? CheckIfV8U8(string file = null, MemoryTributary data = null)
         {
@@ -643,7 +661,7 @@ namespace ResILWrapper
 
 
         /// <summary>
-        /// Read largest V8U8 mipmap into ResIL.
+        /// Read largest V8U8 mipmap into ResIL. Returns true if read successfully.
         /// </summary>
         /// <returns>True if success.</returns>
         private bool ReadV8U8()
@@ -684,27 +702,37 @@ namespace ResILWrapper
 
 
         /// <summary>
-        /// Writes V8U8 image to file.
+        /// Writes V8U8 image to file. Returns true if successful.
         /// </summary>
         /// <param name="bytes">V8U8 data as List.</param>
         /// <param name="savepath">Path to save to.</param>
         /// <param name="height">Height of image.</param>
         /// <param name="width">Width of image.</param>
         /// <param name="Mips">Number of mips in image.</param>
-        private static void WriteV8U8(List<sbyte> bytes, string savepath, int height, int width, int Mips)
+        private static bool WriteV8U8(List<sbyte> bytes, string savepath, int height, int width, int Mips)
         {
             DDS_HEADER header = Get_V8U8_DDS_Header(0, height, width);
-            using (FileStream fs = new FileStream(savepath, FileMode.CreateNew))
+            
+            try
             {
-                using (BinaryWriter writer = new BinaryWriter(fs))
+               using (FileStream fs = new FileStream(savepath, FileMode.CreateNew))
                 {
-                    // KFreon: Get and write header
-                    Write_V8U8_DDS_Header(header, writer);
-
-                    foreach (sbyte byt in bytes)
-                        writer.Write(byt);
-                }
+                    using (BinaryWriter writer = new BinaryWriter(fs))
+                    {
+                        // KFreon: Get and write header
+                        Write_V8U8_DDS_Header(header, writer);
+    
+                        foreach (sbyte byt in bytes)
+                            writer.Write(byt);
+                    }
+                } 
+                return true;
             }
+            catch(IOException e)
+            {
+                Debug.WriteLine("Error writing to file: " + e.Message);
+            }
+            return false;
         }
 
 
@@ -733,38 +761,47 @@ namespace ResILWrapper
 
         #region Manipulation
         /// <summary>
-        /// Convert image to different types and save to path.
+        /// Convert image to different types and save to path. Returns true if successful.
         /// </summary>
         /// <param name="type">Type of image to save as.</param>
         /// <param name="savePath">Path to save to.</param>
-        /// <param name="surface">OPTIONAL: DDS Surface format to change to. Valid only if type is DDS.</param>
+        /// <param name="surface">DDS Surface format to change to. Valid only if type is DDS.</param>
         /// <returns>True if success.</returns>
         public bool ConvertAndSave(ImageType type, string savePath, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
         {
-            // KFreon: Set JPG quality if necessary
             if (SetJPGQuality && type == ImageType.Jpg)
                 ResIL.Settings.SetJPGQuality(quality);
 
-
             ChangeSurface(type, surface);
 
-            // KFreon: Save image
             return IL2.SaveImage(handle, savePath, type);
         }
 
 
+        /// <summary>
+        /// Converts image to different types and saves to stream. Returns true if successful.
+        /// </summary>
+        /// <param name="type">Desired image type.</param>
+        /// <param name="stream">Data of image file, NOT raw pixel data.</param>
+        /// <param name="surface">Surface format. ONLY valid when type is DDS.</param>
+        /// <param name="quality">JPG quality. ONLY valid when tpye is JPG.</param>
+        /// <param name="SetJPGQuality">Sets JPG output quality if true.</param>
         public bool ConvertAndSave(ImageType type, MemoryTributary stream, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
         {
-            // KFreon: Set JPG quality if necessary
             if (SetJPGQuality && type == ImageType.Jpg)
                 ResIL.Settings.SetJPGQuality(quality);
 
             ChangeSurface(type, surface);
 
-            // KFreon: Save image
             return IL2.SaveImageAsStream(handle, type, stream);
         }
 
+        
+        /// <summary>
+        /// Changes DDS surface format to specified format.
+        /// </summary>
+        /// <param name="type">Type of image. Anything other than DDS will be ignored.</param>
+        /// <param name="suface">Desired DDS surface format.</param>
         private void ChangeSurface(ImageType type, CompressedDataFormat surface)
         {
             // KFreon: Change surface format of DDS's
@@ -775,6 +812,7 @@ namespace ResILWrapper
 
         /// <summary>
         /// Resizes image in ResIL. This is permenant in memory. On disk will not be altered.
+        /// Returns true if successful.
         /// </summary>
         /// <param name="width">Width of image.</param>
         /// <param name="height">Height of image.</param>
@@ -785,21 +823,14 @@ namespace ResILWrapper
         }
         #endregion
 
-        public void Dispose()
+
+        public void Dispose(bool finalising = false)
         {
             if (handle == IntPtr.Zero)
                 Debug.WriteLine("Image already deleted.");
             else
             {
-                try
-                {
-                    if (V8U8Mips != null)
-                        V8U8Mips = null;
-                }
-                catch (Exception e)
-                {
-                    Debug.WriteLine("Unable to clear V8U8 Mips array: " + e.Message);
-                }
+                V8U8Mips = null;
 
                 try
                 {
@@ -815,18 +846,19 @@ namespace ResILWrapper
                 // KFreon: Reset file handle
                 handle = IntPtr.Zero;
 
-                GC.SuppressFinalize(this);
+                if (!finalising)
+                    GC.SuppressFinalize(this);
             }
         }
 
 
         /// <summary> 
         /// KFreon: Destructor just calls dispose. Dispose shouldn't fail regardless of number of times called.
-        /// DON'T RELY ON THIS. Use the Dispose pattern, using and all that stuff.
+        /// DON'T RELY ON THIS. Use the Dispose pattern: using, and all that stuff.
         /// </summary>
         ~ResILImage()
         {
-            Dispose();
+            Dispose(true);
         }
     }
 }
