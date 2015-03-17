@@ -245,7 +245,7 @@ namespace ResILWrapper
                 if (!IL2.LoadImage(ref handle, FilePath))
                 {
                     Debug.WriteLine("Loading from file failed for some reason.");
-                    Debug.WriteLine(GET ERROR FUNCTION);
+                    //Debug.WriteLine(GET ERROR FUNCTION);
                 }
             }
             return isNormalMap;
@@ -439,7 +439,7 @@ namespace ResILWrapper
                 SaltisgoodDDSPreview dds = new SaltisgoodDDSPreview(data == null ? new MemoryTributary(File.ReadAllBytes(file)) : data);
                 retval = dds.FormatString == "V8U8";
             }
-            catch
+            catch (FormatException f)
             {
                 // Ignore cos return is already false
             }
@@ -824,7 +824,7 @@ namespace ResILWrapper
         #endregion
 
 
-        public void Dispose(bool finalising = false)
+        public void Dispose(bool finalising)
         {
             if (handle == IntPtr.Zero)
                 Debug.WriteLine("Image already deleted.");
@@ -859,6 +859,11 @@ namespace ResILWrapper
         ~ResILImage()
         {
             Dispose(true);
+        }
+
+        public void Dispose()
+        {
+            Dispose(false);
         }
     }
 }
