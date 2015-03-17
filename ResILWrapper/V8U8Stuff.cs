@@ -219,7 +219,7 @@ namespace ResILWrapper.V8U8Stuff
         private bool compressed;
         private bool stdDDS;
 
-        public SaltisgoodDDSPreview(Stream data)
+        public SaltisgoodDDSPreview(Stream data, bool JustChecking)
         {
             if (UsefulThings.General.StreamBitConverter.ToUInt32(data, 0) != DDSMagic)
                 throw new FormatException("Invalid DDS Magic Number");
@@ -237,9 +237,15 @@ namespace ResILWrapper.V8U8Stuff
             Format = GetDDSFormat(pxformat);
             imgData = new byte[data.Length - 0x80];
 
-            // KFreon: Seek in stream and write to imgData
-            data.Seek(0x80, SeekOrigin.Begin);
-            data.Read(imgData, 0, imgData.Length);
+            // KFreon: Write data if requested
+            if (!JustChecking)
+            {
+                // KFreon: Seek in stream and write to imgData
+                data.Seek(0x80, SeekOrigin.Begin);
+                data.Read(imgData, 0, imgData.Length);
+            }
+            else
+                data.Seek(0x80 + imgData.Length, SeekOrigin.Begin);  // KFreon: Seek to end of data
             //Array.Copy(data, 0x80, imgData, 0, imgData.Length);
 
             pfFlags = UsefulThings.General.StreamBitConverter.ToUInt32(data, 0x50);
