@@ -424,19 +424,41 @@ namespace ResILWrapper
         /// Checks if current working image is a V8U8 NormalMap image.
         /// </summary>
         /// <param name="file">Path to image file. DEFAULT = null, data MUST NOT be null.</param>
-        /// <param name="data">Raw image data. DEFAULT = null, file MUST NOT be null.</param>
         /// <returns>True if V8U8, False if not V8U8, null if invalid parameters provided.</returns>
-        private static bool? CheckIfV8U8(string file = null, MemoryTributary data = null)
+        private static bool? CheckIfV8U8(string file)
         {
-            // KFreon: Check if everything is all good. One parameter MUST NOT be null.
-            if (data == null && file == null)
+            if (file == null)
                 return null;
 
             bool retval = false;
             try
             {
                 // KFreon: Check format
-                SaltisgoodDDSPreview dds = new SaltisgoodDDSPreview(data == null ? new MemoryTributary(File.ReadAllBytes(file)) : data);
+                SaltisgoodDDSPreview dds = new SaltisgoodDDSPreview(new MemoryTributary(File.ReadAllBytes(file)));
+                retval = dds.FormatString == "V8U8";
+            }
+            catch
+            {
+                // Ignore cos return is already false
+            }
+            return retval;
+        }
+        
+        /// <summary>
+        /// Checks if current working image is a V8U8 NormalMap image.
+        /// </summary>
+        /// <param name="data">Texture file data.</param>
+        /// <returns>True if V8U8, False if not V8U8, null if invalid parameters provided.</returns>
+        private static bool? CheckIfV8U8(string data)
+        {
+            if (data == null)
+                return null;
+
+            bool retval = false;
+            try
+            {
+                // KFreon: Check format
+                SaltisgoodDDSPreview dds = new SaltisgoodDDSPreview(data);
                 retval = dds.FormatString == "V8U8";
             }
             catch
