@@ -77,29 +77,28 @@ namespace ResILWrapper
 
         }
 
-        private ResILImage(string FilePath, bool nvm)
+        public ResILImage(string FilePath)
         {
-            // KFreon: Setup valid types and formats
             Path = FilePath;
+            ImageType GivenType = DetermineType(ImageType.Unknown, UsefulThings.General.GetExternalData(FilePath));
+            LoadImage(FilePath);
             PopulateInfo();
         }
 
-        public ResILImage(string FilePath) : this(FilePath, false)
+        public ResILImage(MemoryTributary stream)
         {
-            ImageType GivenType = DetermineType(ImageType.Unknown, UsefulThings.General.GetExternalData(FilePath));
-            LoadImage(FilePath);
-        }
-
-        public ResILImage(MemoryTributary stream) : this(null, false)
-        {
+            Path = null;
             ImageType GivenType = DetermineType(ImageType.Unknown, stream.ToArray());
             LoadImage(stream);
+            PopulateInfo();
         }
 
-        public ResILImage(byte[] imgData, ImageType type = ImageType.Bmp) : this(null, false)
+        public ResILImage(byte[] imgData, ImageType type = ImageType.Bmp)
         {
+            Path = null;
             ImageType GivenType = DetermineType(type, imgData);
             LoadImage(imgData, GivenType);
+            PopulateInfo();
         }
 
 
