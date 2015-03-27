@@ -172,12 +172,7 @@ namespace ResILWrapper
 
         public ViewModel()
         {
-            // KFreon: Setup valid types and formats
-            string[] types = Enum.GetNames(typeof(ResIL.Unmanaged.ImageType));
-            Formats = new List<string>() { "None", "DXT1", "DXT2", "DXT3", "DXT4", "DXT5", "3Dc/ATI2", "RXGB", "ATI1N/BC4", "DXT1A", "V8U8" }; // KFreon: DDS Surface formats
-
-            List<string> moretypes = types.Where(t => t != "Dds" && t != "Unknown").ToList(); // KFreon: Remove DDS from types list
-            Formats.AddRange(moretypes);
+            Formats.AddRange(ResILImage.ValidFormats);
             Status = "Ready.";
         }
 

@@ -20,7 +20,7 @@ namespace ResILWrapper
     /// </summary>
     public class ResILImage : IDisposable
     {
-        public readonly static List<string> ValidFormats = new List<string> { "DXT1", "DXT3", "DXT5", "3DC", "ATI2N", "V8U8", "JPG", "PNG", "BMP", "GIF" };
+        public static List<string> ValidFormats = null;
 
         #region Image Properties
         public string Path { get; private set; }
@@ -67,22 +67,43 @@ namespace ResILWrapper
         }
         #endregion
 
+        public ImageType imgType { get; set; }
 
-        public ResILImage(string FilePath)
+        static ResILImage()
         {
+            string[] types = Enum.GetNames(typeof(ResIL.Unmanaged.ImageType));
+            ValidFormats = new List<string>() { "None", "DXT1", "DXT2", "DXT3", "DXT4", "DXT5", "3Dc/ATI2", "RXGB", "ATI1N/BC4", "DXT1A", "V8U8" }; // KFreon: DDS Surface formats
+            ValidFormats.AddRange(types.Where(t => t != "Dds" && t != "Unknown").ToList()); // KFreon: Remove DDS from types list
+
+        }
+
+        private ResILImage(string FilePath, bool nvm)
+        {
+            // KFreon: Setup valid types and formats
             Path = FilePath;
-            LoadImage(FilePath);
             PopulateInfo();
         }
 
-        public ResILImage(MemoryTributary stream)
+        public ResILImage(string FilePath) : this(FilePath, false)
         {
-            Path = null;
-            LoadImage(stream);
-            PopulateInfo();
+            ImageType GivenType = DetermineType(ImageType.Unknown, UsefulThings.General.GetExternalData(FilePath));
+            LoadImage(FilePath);
         }
 
-        public ResILImage(byte[] imgData, ImageType type = ImageType.Bmp)
+        public ResILImage(MemoryTributary stream) : this(null, false)
+        {
+            ImageType GivenType = DetermineType(ImageType.Unknown, stream.ToArray());
+            LoadImage(stream);
+        }
+
+        public ResILImage(byte[] imgData, ImageType type = ImageType.Bmp) : this(null, false)
+        {
+            ImageType GivenType = DetermineType(type, imgData);
+            LoadImage(imgData, GivenType);
+        }
+
+
+        private ImageType DetermineType(ImageType type, byte[] imgData)
         {
             // KFreon: Attempt to determine type unless provided
             ImageType GivenType = type;
@@ -93,11 +114,14 @@ namespace ResILWrapper
             if (type == ImageType.Unknown)
                 GivenType = type;
 
-            Path = null;
-            LoadImage(imgData, GivenType);
-            PopulateInfo();
+            imgType = type;
+            return GivenType;
         }
-        
+
+        private ImageType DetermineType(ImageType type, string filename)
+        {
+            return DetermineType(type, UsefulThings.General.GetExternalData(filename));
+        }
 
         /// <summary>
         /// Populates image information from the ILImage*.
@@ -422,7 +446,7 @@ namespace ResILWrapper
         #region V8U8 Stuff
         /// <summary>
         /// Checks if current working image is a V8U8 NormalMap image.
-        /// </summary>
+        /// </summary> m
         /// <param name="file">Path to image file. DEFAULT = null, data MUST NOT be null.</param>
         /// <returns>True if V8U8, False if not V8U8, null if invalid parameters provided.</returns>
         private static bool? CheckIfV8U8(string file)
@@ -434,7 +458,7 @@ namespace ResILWrapper
             try
             {
                 // KFreon: Check format
-                SaltisgoodDDSPreview dds = new SaltisgoodDDSPreview(new MemoryTributary(File.ReadAllBytes(file)));
+                SaltisgoodDDSPreview dds = new SaltisgoodDDSPreview(new MemoryTributary(File.ReadAllBytes(file)), true);
                 retval = dds.FormatString == "V8U8";
             }
             catch
@@ -449,7 +473,7 @@ namespace ResILWrapper
         /// </summary>
         /// <param name="data">Texture file data.</param>
         /// <returns>True if V8U8, False if not V8U8, null if invalid parameters provided.</returns>
-        private static bool? CheckIfV8U8(string data)
+        private static bool? CheckIfV8U8(MemoryTributary data)
         {
             if (data == null)
                 return null;
@@ -458,7 +482,7 @@ namespace ResILWrapper
             try
             {
                 // KFreon: Check format
-                SaltisgoodDDSPreview dds = new SaltisgoodDDSPreview(data);
+                SaltisgoodDDSPreview dds = new SaltisgoodDDSPreview(data, true);
                 retval = dds.FormatString == "V8U8";
             }
             catch (FormatException f)
