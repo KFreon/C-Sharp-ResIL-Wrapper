@@ -298,6 +298,7 @@ namespace ResILWrapper
                 IL2.Settings.KeepDXTC(true);
                 if (!IL2.LoadImageFromArray(ref handle, data, type))
                 {
+                    Debugger.Break();
                     Debug.WriteLine("Loading image failed for some reason");
                     Debug.WriteLine(Enum.GetName(typeof(ErrorType), IL2.GetError()));
                 }

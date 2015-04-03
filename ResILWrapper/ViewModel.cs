@@ -172,7 +172,7 @@ namespace ResILWrapper
 
         public ViewModel()
         {
-            Formats.AddRange(ResILImage.ValidFormats);
+            Formats = new List<string>(ResILImage.ValidFormats);
             Status = "Ready.";
         }
 
