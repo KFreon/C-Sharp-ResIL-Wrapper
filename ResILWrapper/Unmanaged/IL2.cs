@@ -18,7 +18,7 @@ namespace ResIL.Unmanaged
     public static class IL2
     {
         const string IL2DLL = "ResIL.dll";
-        public static bool isInitialised { get; private set; }
+        public static bool isInitialised { get; private set; }  // KFreon: Denotes subsystem initialisation status
 
         #region Constructor stuff
         [DllImport("kernel32.dll")]
@@ -46,7 +46,7 @@ namespace ResIL.Unmanaged
             IntPtr ILU = LoadLibrary(ilu);
             IntPtr ILUT = LoadLibrary(ilut);
 
-            Init();
+            Init();  // KFreon: Initialise subsystem
         }
         #endregion
 
@@ -56,12 +56,13 @@ namespace ResIL.Unmanaged
         /// <summary>
         /// Load image from byte[].
         /// </summary>
-        /// <param name="img">Ref to current image pointer.</param>
+        /// <param name="img">Current image.</param>
         /// <param name="imageData">Image Data array.</param>
+        /// <param name="type">Type of image being loaded.</param>
         /// <returns>True if loading succeeds.</returns>
         public static bool LoadImageFromArray(ref IntPtr img, byte[] imageData, ImageType type = ImageType.Bmp)
         {
-            // KFreon: Initialised if necessary
+            // KFreon: Initialise if necessary
             if (!isInitialised)
                 Init();
             return il2LoadL(img, type, imageData, (uint)imageData.Length);
@@ -132,7 +133,7 @@ namespace ResIL.Unmanaged
         {
             il2Init();
             isInitialised = true;
-            Settings.SetSquishCompression(true);   // KFreon: Set better compression. This may not be relevant. 
+            Settings.SetSquishCompression(true);   // KFreon: Set better compression. This may not be relevant or even useful.. 
         }
 
 
@@ -176,8 +177,10 @@ namespace ResIL.Unmanaged
             }
             catch
             {
-
+                // KFreon: Ignore?
             }
+            
+            img = IntPtr.Zero;  // KFreon: Invalidate pointer
             return true;
         }
 
@@ -208,7 +211,7 @@ namespace ResIL.Unmanaged
         /// </summary>
         /// <param name="handle">Pointer to current image.</param>
         /// <param name="type">Type of image to save as.</param>
-        /// <param name="lump">OUT: Byte[] to save to.</param>
+        /// <param name="lump">Byte[] to save to.</param>
         /// <returns>Length of data written to array. 0 if failed.</returns>
         public static long SaveToArray(IntPtr handle, ImageType type, out byte[] lump)
         {
@@ -218,7 +221,10 @@ namespace ResIL.Unmanaged
         }
 
 
-        
+        /// <summary>
+        /// Saves image to stream.
+        /// <param name="handle">Image to save.</param>
+        /// </summary>
         public static bool SaveImageAsStream(IntPtr handle, ImageType type, MemoryTributary stream)
         {
             byte[] lump = null;
