@@ -364,7 +364,7 @@ namespace ResIL.Unmanaged
 
         #region IL2 Native Methods
         // KFreon: Don't know why ordinal is required here, but name is not found...
-        [DllImport(IL2DLL, EntryPoint="#37", ExactSpelling=true)]
+        [DllImport(IL2DLL, EntryPoint="il2DetermineTypeL")]
         private static extern uint il2DetermineTypeL(byte[] lump, uint size);
 
         [DllImport(IL2DLL, EntryPoint = "il2GetError")]

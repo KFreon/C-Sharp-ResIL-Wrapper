@@ -35,7 +35,7 @@ namespace ResILWrapper
         {
             SaveFileDialog sfd = new SaveFileDialog();
             sfd.Title = "Select destination";
-            sfd.Filter = ResILImage.GetFilterString(ResILImage.GetExtensionFromFormat(vm.SelectedFormat));
+            sfd.Filter = String.IsNullOrEmpty(vm.SelectedFormat) ? "" : ResILImage.GetFilterString(ResILImage.GetExtensionFromFormat(vm.SelectedFormat));
             if (sfd.ShowDialog() == true)
                 vm.SavePath = sfd.FileName;
         }

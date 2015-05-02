@@ -164,6 +164,19 @@ namespace ResILWrapper
         }
         #endregion
 
+        bool generateMips = true;
+        public bool GenerateMips
+        {
+            get
+            {
+                return generateMips;
+            }
+            set
+            {
+                generateMips = value;
+                OnPropertyChanged();
+            }
+        }
 
         public ViewModel(ResILImage im) : this()
         {
@@ -199,6 +212,11 @@ namespace ResILWrapper
             if (SelectedFormat.Contains("DXT") || SelectedFormat.Contains("V8U8") || SelectedFormat.Contains("ATI"))
             {
                 ResIL.Unmanaged.CompressedDataFormat surface = (ResIL.Unmanaged.CompressedDataFormat)Enum.Parse(typeof(ResIL.Unmanaged.CompressedDataFormat), SelectedFormat);
+
+                if (GenerateMips)
+                    img.BuildMipmaps();
+                else
+                    img.RemoveMipmaps();
                 img.ConvertAndSave(ResIL.Unmanaged.ImageType.Dds, SavePath, surface);
             }
             else  // KFreon: Everything else

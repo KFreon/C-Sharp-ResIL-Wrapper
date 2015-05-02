@@ -80,7 +80,8 @@ namespace ResILWrapper
         public ResILImage(string FilePath)
         {
             Path = FilePath;
-            ImageType GivenType = DetermineType(ImageType.Unknown, UsefulThings.General.GetExternalData(FilePath));
+            Debugger.Break();
+            imgType = DetermineType(ImageType.Unknown, UsefulThings.General.GetExternalData(FilePath));
             LoadImage(FilePath);
             PopulateInfo();
         }
@@ -88,7 +89,7 @@ namespace ResILWrapper
         public ResILImage(MemoryTributary stream)
         {
             Path = null;
-            ImageType GivenType = DetermineType(ImageType.Unknown, stream.ToArray());
+            imgType = DetermineType(ImageType.Unknown, stream.ToArray());
             LoadImage(stream);
             PopulateInfo();
         }
@@ -96,8 +97,8 @@ namespace ResILWrapper
         public ResILImage(byte[] imgData, ImageType type = ImageType.Bmp)
         {
             Path = null;
-            ImageType GivenType = DetermineType(type, imgData);
-            LoadImage(imgData, GivenType);
+            imgType = DetermineType(type, imgData);
+            LoadImage(imgData, imgType);
             PopulateInfo();
         }
 
@@ -107,13 +108,12 @@ namespace ResILWrapper
             // KFreon: Attempt to determine type unless provided
             ImageType GivenType = type;
 
-            if (type == ImageType.Bmp)
+            if (type == ImageType.Bmp || type == ImageType.Unknown)
                 GivenType = IL2.DetermineImageType(imgData);
 
-            if (type == ImageType.Unknown)
+            if (GivenType == ImageType.Unknown)
                 GivenType = type;
 
-            imgType = type;
             return GivenType;
         }
 
@@ -298,7 +298,6 @@ namespace ResILWrapper
                 IL2.Settings.KeepDXTC(true);
                 if (!IL2.LoadImageFromArray(ref handle, data, type))
                 {
-                    Debugger.Break();
                     Debug.WriteLine("Loading image failed for some reason");
                     Debug.WriteLine(Enum.GetName(typeof(ErrorType), IL2.GetError()));
                 }
@@ -366,11 +365,16 @@ namespace ResILWrapper
             else
             {
                 Debug.WriteLine("To Array failed for some reason.");
-                Debug.WriteLine(Enum.GetName(typeof(ErrorType), IL2.GetError()));
+                Debug.WriteLine(GetResILError());
             }
             return null;
         }
 
+
+        public static string GetResILError()
+        {
+            return Enum.GetName(typeof(ErrorType), IL2.GetError());
+        }
 
         #region Static methods
         /// <summary>
@@ -803,6 +807,22 @@ namespace ResILWrapper
             ReadV8U8();
         }
         #endregion
+
+        public bool BuildMipmaps(bool rebuild = false)
+        {
+            if (!rebuild && Mips > 1)
+                return false;
+            else
+                return ILU2.BuildMipmaps(handle);
+        }
+
+        public bool RemoveMipmaps(bool forceRemoval = false)
+        {
+            if (!forceRemoval && Mips == 1)
+                return false;
+            else
+                return ILU2.RemoveMips(handle);
+        }
 
 
         #region Manipulation

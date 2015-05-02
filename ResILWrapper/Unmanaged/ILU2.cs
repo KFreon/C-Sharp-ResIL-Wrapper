@@ -25,7 +25,25 @@ namespace ResIL.Unmanaged
         }
 
 
+        public static bool BuildMipmaps(IntPtr handle)
+        {
+            return ilu2BuildMipmaps(handle);
+        }
+
+
+        public static bool RemoveMips(IntPtr handle)
+        {
+            return ilu2DestroyMipmaps(handle);
+        }
+
+
         [DllImport(ILU2DLL, EntryPoint = "il2ResizeImage")]
         private static extern bool il2ResizeImage(IntPtr img, uint width, uint height, uint depth, byte bpp, byte bpc);
+
+        [DllImport(ILU2DLL, EntryPoint = "ilu2BuildMipmaps")]
+        private static extern bool ilu2BuildMipmaps(IntPtr img);
+
+        [DllImport(ILU2DLL, EntryPoint = "ilu2DestroyMipmaps")]  // Dunno why need ordinal here, but name doesn't work
+        private static extern bool ilu2DestroyMipmaps(IntPtr img);
     }
 }
