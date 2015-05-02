@@ -176,8 +176,14 @@ namespace ResIL.Unmanaged
         /// </summary>
         UnknownError = 0x05FF,
 
-
+        /// <summary>
+        /// DDS data not found.
+        /// </summary>
         No_DDS_Data = 0x0513,
+        
+        /// <summary>
+        /// Invalid or unexpected DDS compression.
+        /// </summary>
         DDS_Compression_Incorrect = 0x0514
     }
 
