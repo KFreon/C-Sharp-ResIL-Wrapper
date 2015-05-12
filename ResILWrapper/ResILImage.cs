@@ -373,7 +373,7 @@ namespace ResILWrapper
 
         public static string GetResILError()
         {
-            return Enum.GetName(typeof(ErrorType), IL2.GetError());
+            return Enum.GetName(typeof(ErrorType), IL2.GetError());   check this to see if theres depth to errors array?
         }
 
         #region Static methods
@@ -391,7 +391,7 @@ namespace ResILWrapper
                 ext = null;
 
             // KFreon: Get a format
-            if (format.Contains("DXT") || format == "3Dc" || format == "ATI2N" || format == "V8U8")
+            if (isDDS(format))
                 ext = ".DDS";
             else
             {
@@ -450,7 +450,7 @@ namespace ResILWrapper
         #region V8U8 Stuff
         /// <summary>
         /// Checks if current working image is a V8U8 NormalMap image.
-        /// </summary> m
+        /// </summary>
         /// <param name="file">Path to image file. DEFAULT = null, data MUST NOT be null.</param>
         /// <returns>True if V8U8, False if not V8U8, null if invalid parameters provided.</returns>
         private static bool? CheckIfV8U8(string file)
@@ -588,16 +588,12 @@ namespace ResILWrapper
                 w = (int)(header.dwWidth / Math.Pow(2, i));
                 h = (int)(header.dwHeight / Math.Pow(2, i));
 
-                // KFreon: Set max image size
-                if (i == 0)
-                {
-                    Width = w;
-                    Height = h;
-                }
-
                 int mipMapBytes = (int)(w * h * bytePerPixel);
                 V8U8Mips[i] = new MipMap(r.ReadBytes(mipMapBytes), DDSFormat.V8U8, w, h);
             }
+            
+            Width = header.dwWidth;
+            Height = header.dwHeight;
         }
 
 
@@ -759,7 +755,7 @@ namespace ResILWrapper
         /// <param name="height">Height of image.</param>
         /// <param name="width">Width of image.</param>
         /// <param name="Mips">Number of mips in image.</param>
-        private static bool WriteV8U8(List<sbyte> bytes, string savepath, int height, int width, int Mips)
+        private static bool WriteV8U8(List<sbyte> bytes, string savepath, int height, int width, int Mips)  check that this gets used - it needs to.
         {
             DDS_HEADER header = Get_V8U8_DDS_Header(0, height, width);
             
@@ -812,6 +808,10 @@ namespace ResILWrapper
         {
             if (!rebuild && Mips > 1)
                 return false;
+            else if (Format == V8U8)
+                {
+                    BuildV8U8Mips();
+                }
             else
                 return ILU2.BuildMipmaps(handle);
         }
@@ -820,8 +820,48 @@ namespace ResILWrapper
         {
             if (!forceRemoval && Mips == 1)
                 return false;
+            else if (Format == V8U8)
+            {
+                V8U8Mipmaps.Remove(1,);
+            }
             else
                 return ILU2.RemoveMips(handle);
+        }
+        
+        private bool BuildV8U8Mips()
+        {
+            bool success = false;
+            
+            int width = V8U8Mips[0].Width / 2;
+            int height = V8U8Mips[0].Height / 2;
+            
+            DebugOutput.WriteLine("Building V8U8 Mips with starting MIP size of {0} x {1}.", width, height);
+            
+            byte[] data = V8U8Mips[0].Data;
+            try
+            {
+                int count = 1;
+                while (width > 1 && height > 1)
+                {
+                    using (ResILImage mipmap = new ResILImage(data))
+                    {
+                        mipmap.Resize(widt, height);  // Note integer division - need to round somewhere
+                        byte[] tempdata = mipmap.ToArray();
+                        data = tempdata;
+                        V8U8Mips[count++] = new MipMap(tempdata, DDSFormat.V8U8, width, height);
+                    }
+                    
+                    height = (int)(height / 2);
+                    width = (int)(width / 2);   
+                }
+                
+                success = true;
+            }
+            catch(Exception e)
+            {
+                cw;
+            }
+            return success;
         }
 
 
@@ -833,10 +873,13 @@ namespace ResILWrapper
         /// <param name="savePath">Path to save to.</param>
         /// <param name="surface">DDS Surface format to change to. Valid only if type is DDS.</param>
         /// <returns>True if success.</returns>
-        public bool ConvertAndSave(ImageType type, string savePath, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
+        public bool ConvertAndSave(ImageType type, string savePath, generateMipsenum, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
         {
             if (SetJPGQuality && type == ImageType.Jpg)
                 ResIL.Settings.SetJPGQuality(quality);
+
+            BUildMips();  one of these needs to work on V8U8
+            RemoveMIps();
 
             ChangeSurface(type, surface);
 
@@ -885,12 +928,33 @@ namespace ResILWrapper
         /// <returns>True if success.</returns>
         public bool Resize(int width, int height)
         {
-            return ILU2.ResizeImage(handle, (uint)width, (uint)height, (byte)BitsPerPixel, (byte)Channels);
+            bool success = false;
+            if (Format == V8U8)
+            {
+                if ((width / height == Width / Height))
+                {
+                    List<MipMap> newmips = new List<MipMap>();
+                    foreach(MipMap mip in V8U8Mips)
+                        if (MipMap.Width <= width)  // KFreon: Note that aspect is the same, so only need to check one dimension
+                            newmips.Add(mip);
+                    V8U8Mips = newmips.ToArray(newmips.Count);
+                    success = true;
+                }
+                else
+                {
+                    success = ILU2.ResizeImage(handle, (uint)width, (uint)height, (byte)BitsPerPixel, (byte)Channels);
+                    BuildMips();
+                }
+            }
+            else
+                success = ILU2.ResizeImage(handle, (uint)width, (uint)height, (byte)BitsPerPixel, (byte)Channels);
+                
+            return success;
         }
         #endregion
 
 
-        public void Dispose(bool finalising)
+        private void Dispose(bool finalising)
         {
             if (handle == IntPtr.Zero)
                 Debug.WriteLine("Image already deleted.");
