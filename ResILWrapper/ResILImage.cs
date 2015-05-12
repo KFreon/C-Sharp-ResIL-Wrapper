@@ -21,6 +21,7 @@ namespace ResILWrapper
     public class ResILImage : IDisposable
     {
         public static List<string> ValidFormats { get; private set; }
+        public static List<string> DDSFormats { get; private set; }
 
         #region Image Properties
         public string Path { get; private set; }
@@ -72,9 +73,8 @@ namespace ResILWrapper
         static ResILImage()
         {
             string[] types = Enum.GetNames(typeof(ResIL.Unmanaged.ImageType));
-            ValidFormats = new List<string>() { "None", "DXT1", "DXT2", "DXT3", "DXT4", "DXT5", "3Dc/ATI2", "RXGB", "ATI1N/BC4", "DXT1A", "V8U8", "G8", "ARGB" }; // KFreon: DDS Surface formats
-            ValidFormats.AddRange(types.Where(t => t != "Dds" && t != "Unknown").ToList()); // KFreon: Remove DDS from types list
-
+            DDSFormats = new List<string>() { "None", "DXT1", "DXT2", "DXT3", "DXT4", "DXT5", "3Dc/ATI2", "RXGB", "ATI1N/BC4", "DXT1A", "V8U8", "G8", "ARGB" }; // KFreon: DDS Surface formats
+            ValidFormats = new List<string>(types.Where(t => t != "Dds" && t != "Unknown")).Concat(DDSFormats).ToList(30);  // KFreon: Remove DDS from types list
         }
 
         public ResILImage(string FilePath)
@@ -378,10 +378,16 @@ namespace ResILWrapper
 
         public static string GetResILError()
         {
-            return Enum.GetName(typeof(ErrorType), IL2.GetError());   check this to see if theres depth to errors array?
+            return Enum.GetName(typeof(ErrorType), IL2.GetError());
         }
 
         #region Static methods
+        public static bool IsTextureDDS(string format)
+        {
+            return DDSFormats.Contains(t => t.Contains(format, StringComparison.CurrentCultureIgnoreCase));
+        }
+
+
         /// <summary>
         /// Decides on an extension based on a format string. Returns extension with a dot, or null if invalid format.
         /// </summary>
@@ -396,7 +402,7 @@ namespace ResILWrapper
                 ext = null;
 
             // KFreon: Get a format
-            if (isDDS(format))
+            if (ResILImage.IsTextureDDS(format))
                 ext = ".DDS";
             else
             {
@@ -760,7 +766,7 @@ namespace ResILWrapper
         /// <param name="height">Height of image.</param>
         /// <param name="width">Width of image.</param>
         /// <param name="Mips">Number of mips in image.</param>
-        private static bool WriteV8U8(List<sbyte> bytes, string savepath, int height, int width, int Mips)  check that this gets used - it needs to.
+        private static bool WriteV8U8(List<sbyte> bytes, string savepath, int height, int width, int Mips)
         {
             DDS_HEADER header = Get_V8U8_DDS_Header(0, height, width);
             
@@ -813,10 +819,8 @@ namespace ResILWrapper
         {
             if (!rebuild && Mips > 1)
                 return false;
-            else if (Format == V8U8)
-                {
-                    BuildV8U8Mips();
-                }
+            else if (SurfaceFormat == CompressedDataFormat.V8U8)
+                return BuildV8U8Mips();
             else
                 return ILU2.BuildMipmaps(handle);
         }
@@ -825,24 +829,24 @@ namespace ResILWrapper
         {
             if (!forceRemoval && Mips == 1)
                 return false;
-            else if (Format == V8U8)
-            {
-                V8U8Mipmaps.Remove(1,);
-            }
+            else if (SurfaceFormat == CompressedDataFormat.V8U8)
+                V8U8Mips = new MipMap[] {V8U8Mips[0] };   // KFreon: Take largest mipmap and ditch the rest
             else
                 return ILU2.RemoveMips(handle);
+
+            return true;
         }
 
         private bool BuildV8U8Mips()
         {
             bool success = false;
             
-            int width = V8U8Mips[0].Width / 2;
-            int height = V8U8Mips[0].Height / 2;
+            int width = V8U8Mips[0].width / 2;
+            int height = V8U8Mips[0].height / 2;
             
-            DebugOutput.WriteLine("Building V8U8 Mips with starting MIP size of {0} x {1}.", width, height);
+            Debug.WriteLine("Building V8U8 Mips with starting MIP size of {0} x {1}.", width, height);
             
-            byte[] data = V8U8Mips[0].Data;
+            byte[] data = V8U8Mips[0].data;
             try
             {
                 int count = 1;
@@ -850,8 +854,8 @@ namespace ResILWrapper
                 {
                     using (ResILImage mipmap = new ResILImage(data))
                     {
-                        mipmap.Resize(widt, height);  // Note integer division - need to round somewhere
-                        byte[] tempdata = mipmap.ToArray();
+                        mipmap.Resize(width, height);  // Note integer division - need to round somewhere
+                        byte[] tempdata = mipmap.ToArray(ImageType.Png);  // KFreon: Just RGB stuff. Gets read back in and dealt with accordingly (I hope...)
                         data = tempdata;
                         V8U8Mips[count++] = new MipMap(tempdata, DDSFormat.V8U8, width, height);
                     }
@@ -864,13 +868,18 @@ namespace ResILWrapper
             }
             catch(Exception e)
             {
-                cw;
+                Console.WriteLine(e);
             }
             return success;
         }
 
 
         #region Manipulation
+        public enum MipMapMode
+        {
+            BuildAll, RemoveAllButOne, Rebuild, ForceRemove, None
+        }
+
         /// <summary>
         /// Convert image to different types and save to path. Returns true if successful.
         /// </summary>
@@ -878,13 +887,32 @@ namespace ResILWrapper
         /// <param name="savePath">Path to save to.</param>
         /// <param name="surface">DDS Surface format to change to. Valid only if type is DDS.</param>
         /// <returns>True if success.</returns>
-        public bool ConvertAndSave(ImageType type, string savePath, generateMipsenum, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
+        public bool ConvertAndSave(ImageType type, string savePath, MipMapMode MipsMode = MipMapMode.None, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
         {
             if (SetJPGQuality && type == ImageType.Jpg)
                 ResIL.Settings.SetJPGQuality(quality);
 
-            BUildMips();  one of these needs to work on V8U8
-            RemoveMIps();
+            bool mipsOperationSuccess = false;
+            switch (MipsMode)
+            {
+                case MipMapMode.BuildAll:
+                    mipsOperationSuccess = BuildMipmaps();
+                    break;
+                case MipMapMode.Rebuild:
+                    mipsOperationSuccess = BuildMipmaps(true);
+                    break;
+                case MipMapMode.RemoveAllButOne:
+                    mipsOperationSuccess = RemoveMipmaps();
+                    break;
+                case MipMapMode.ForceRemove:
+                    mipsOperationSuccess = RemoveMipmaps(true);
+                    break;
+                case MipMapMode.None:
+                    break;
+            }
+
+            if (!mipsOperationSuccess)
+                Console.WriteLine("Failed to build mips for {0}", savePath);
 
             ChangeSurface(type, surface);
 
@@ -900,10 +928,30 @@ namespace ResILWrapper
         /// <param name="surface">Surface format. ONLY valid when type is DDS.</param>
         /// <param name="quality">JPG quality. ONLY valid when tpye is JPG.</param>
         /// <param name="SetJPGQuality">Sets JPG output quality if true.</param>
-        public bool ConvertAndSave(ImageType type, MemoryTributary stream, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
+        public bool ConvertAndSave(ImageType type, MemoryTributary stream, MipMapMode MipsMode = MipMapMode.None, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
         {
             if (SetJPGQuality && type == ImageType.Jpg)
                 ResIL.Settings.SetJPGQuality(quality);
+
+            bool mipsOperationSuccess = false;
+            switch (MipsMode)
+            {
+                case MipMapMode.BuildAll:
+                    mipsOperationSuccess = BuildMipmaps();
+                    break;
+                case MipMapMode.Rebuild:
+                    mipsOperationSuccess = BuildMipmaps(true);
+                    break;
+                case MipMapMode.RemoveAllButOne:
+                    mipsOperationSuccess = RemoveMipmaps();
+                    break;
+                case MipMapMode.ForceRemove:
+                    mipsOperationSuccess = RemoveMipmaps(true);
+                    break;
+            }
+
+            if (!mipsOperationSuccess)
+                Console.WriteLine("Failed to build mips for image.");
 
             ChangeSurface(type, surface);
 
@@ -934,13 +982,13 @@ namespace ResILWrapper
         public bool Resize(int width, int height)
         {
             bool success = false;
-            if (Format == V8U8)
+            if (SurfaceFormat ==  CompressedDataFormat.V8U8)
             {
                 if ((width / height == Width / Height))
                 {
                     List<MipMap> newmips = new List<MipMap>();
                     foreach(MipMap mip in V8U8Mips)
-                        if (MipMap.Width <= width)  // KFreon: Note that aspect is the same, so only need to check one dimension
+                        if (mip.width <= width)  // KFreon: Note that aspect is the same, so only need to check one dimension
                             newmips.Add(mip);
                     V8U8Mips = newmips.ToArray(newmips.Count);
                     success = true;
@@ -948,7 +996,7 @@ namespace ResILWrapper
                 else
                 {
                     success = ILU2.ResizeImage(handle, (uint)width, (uint)height, (byte)BitsPerPixel, (byte)Channels);
-                    BuildMips();
+                    BuildMipmaps();
                 }
             }
             else

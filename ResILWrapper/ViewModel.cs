@@ -220,11 +220,7 @@ namespace ResILWrapper
             {
                 ResIL.Unmanaged.CompressedDataFormat surface = (ResIL.Unmanaged.CompressedDataFormat)Enum.Parse(typeof(ResIL.Unmanaged.CompressedDataFormat), tempformat);
 
-                if (GenerateMips)
-                    img.BuildMipmaps();
-                else
-                    img.RemoveMipmaps();
-                img.ConvertAndSave(ResIL.Unmanaged.ImageType.Dds, SavePath, surface);
+                img.ConvertAndSave(ResIL.Unmanaged.ImageType.Dds, SavePath, GenerateMips ? ResILImage.MipMapMode.BuildAll : ResILImage.MipMapMode.None, surface);
             }
             else  // KFreon: Everything else
             {
