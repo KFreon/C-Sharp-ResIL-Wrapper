@@ -144,7 +144,7 @@ namespace ResILWrapper.V8U8Stuff
             DXT1 = 0x31545844,
             DXT3 = 0x33545844,
             DXT5 = 0x35545844,
-            ATI2 = 0x32495441
+            ATI2 = 0x32495441,
         }
 
         public class DDS_HEADER
@@ -190,7 +190,7 @@ namespace ResILWrapper.V8U8Stuff
 
         public enum DDSFormat
         {
-            DXT1, DXT3, DXT5, V8U8, ATI2, G8, ARGB
+            DXT1, DXT3, DXT5, V8U8, ATI2, G8, ARGB,
         }
     }
     

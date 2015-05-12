@@ -20,7 +20,7 @@ namespace ResILWrapper
     /// </summary>
     public class ResILImage : IDisposable
     {
-        public static List<string> ValidFormats = null;
+        public static List<string> ValidFormats { get; private set; }
 
         #region Image Properties
         public string Path { get; private set; }
@@ -72,7 +72,7 @@ namespace ResILWrapper
         static ResILImage()
         {
             string[] types = Enum.GetNames(typeof(ResIL.Unmanaged.ImageType));
-            ValidFormats = new List<string>() { "None", "DXT1", "DXT2", "DXT3", "DXT4", "DXT5", "3Dc/ATI2", "RXGB", "ATI1N/BC4", "DXT1A", "V8U8" }; // KFreon: DDS Surface formats
+            ValidFormats = new List<string>() { "None", "DXT1", "DXT2", "DXT3", "DXT4", "DXT5", "3Dc/ATI2", "RXGB", "ATI1N/BC4", "DXT1A", "V8U8", "G8", "ARGB" }; // KFreon: DDS Surface formats
             ValidFormats.AddRange(types.Where(t => t != "Dds" && t != "Unknown").ToList()); // KFreon: Remove DDS from types list
 
         }
@@ -80,7 +80,6 @@ namespace ResILWrapper
         public ResILImage(string FilePath)
         {
             Path = FilePath;
-            Debugger.Break();
             imgType = DetermineType(ImageType.Unknown, UsefulThings.General.GetExternalData(FilePath));
             LoadImage(FilePath);
             PopulateInfo();
@@ -357,9 +356,15 @@ namespace ResILWrapper
         /// Converts instance to array of image data of a given image type.
         /// </summary>
         /// <param name="type">Type of image to get data of.</param>
-        public byte[] ToArray(ImageType type)
+        public byte[] ToArray(ImageType type, int jpgQuality = 80)
         {
             byte[] data = null;
+
+            // KFreon: Set JPG quality if necessary
+            if (type == ImageType.Jpg)
+                ResIL.Settings.SetJPGQuality(jpgQuality);
+
+
             if (IL2.SaveToArray(handle, type, out data) != 0)
                 return data;
             else
@@ -391,7 +396,7 @@ namespace ResILWrapper
                 ext = null;
 
             // KFreon: Get a format
-            if (format.Contains("DXT") || format == "3Dc" || format == "ATI2N" || format == "V8U8")
+            if (format.Contains("DXT") || format == "3Dc" || format == "ATI2N" || format == "V8U8" || format.Contains("ATI1N"))
                 ext = ".DDS";
             else
             {
@@ -465,7 +470,7 @@ namespace ResILWrapper
                 SaltisgoodDDSPreview dds = new SaltisgoodDDSPreview(new MemoryTributary(File.ReadAllBytes(file)), true);
                 retval = dds.FormatString == "V8U8";
             }
-            catch
+            catch (FormatException f)
             {
                 // Ignore cos return is already false
             }
@@ -839,7 +844,7 @@ namespace ResILWrapper
                 ResIL.Settings.SetJPGQuality(quality);
 
             ChangeSurface(type, surface);
-
+            
             return IL2.SaveImage(handle, savePath, type);
         }
 

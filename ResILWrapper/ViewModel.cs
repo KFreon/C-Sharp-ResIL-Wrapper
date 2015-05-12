@@ -208,10 +208,17 @@ namespace ResILWrapper
         {
             Status = "Saving...";
 
+            string tempformat = SelectedFormat;
+            if (tempformat.Contains("\\"))
+                tempformat = tempformat.Split('\\')[0];
+
+            if (tempformat.Contains('/'))
+                tempformat = tempformat.Split('/')[0];
+
             // KFreon: DDS's
             if (SelectedFormat.Contains("DXT") || SelectedFormat.Contains("V8U8") || SelectedFormat.Contains("ATI"))
             {
-                ResIL.Unmanaged.CompressedDataFormat surface = (ResIL.Unmanaged.CompressedDataFormat)Enum.Parse(typeof(ResIL.Unmanaged.CompressedDataFormat), SelectedFormat);
+                ResIL.Unmanaged.CompressedDataFormat surface = (ResIL.Unmanaged.CompressedDataFormat)Enum.Parse(typeof(ResIL.Unmanaged.CompressedDataFormat), tempformat);
 
                 if (GenerateMips)
                     img.BuildMipmaps();
@@ -221,7 +228,7 @@ namespace ResILWrapper
             }
             else  // KFreon: Everything else
             {
-                ResIL.Unmanaged.ImageType type = (ResIL.Unmanaged.ImageType)Enum.Parse(typeof(ResIL.Unmanaged.ImageType), SelectedFormat);
+                ResIL.Unmanaged.ImageType type = (ResIL.Unmanaged.ImageType)Enum.Parse(typeof(ResIL.Unmanaged.ImageType), tempformat);
                 img.ConvertAndSave(type, SavePath);
             }
             Status = "Saved!";

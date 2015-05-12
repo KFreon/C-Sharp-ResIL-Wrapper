@@ -224,6 +224,8 @@ namespace ResIL.Unmanaged
         /// <summary>
         /// Saves image to stream.
         /// <param name="handle">Image to save.</param>
+        /// <param name="stream">Stream to save to.</param>
+        /// <param name="type">Type of image to save as.</param>
         /// </summary>
         public static bool SaveImageAsStream(IntPtr handle, ImageType type, MemoryTributary stream)
         {
