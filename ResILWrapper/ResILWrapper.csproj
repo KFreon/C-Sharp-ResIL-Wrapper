@@ -106,6 +106,8 @@
     <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ResILImageBase.cs" />
+    <Compile Include="V8U8Image.cs" />
     <Compile Include="ViewModel.cs" />
     <None Include="App.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -117,7 +119,6 @@
     </Compile>
     <Compile Include="ResILImage.cs" />
     <Compile Include="Unmanaged\Settings.cs" />
-    <Compile Include="V8U8Stuff.cs" />
     <Compile Include="Unmanaged\Defines.cs" />
     <Compile Include="Unmanaged\Enums.cs" />
     <Compile Include="Unmanaged\IL2.cs" />

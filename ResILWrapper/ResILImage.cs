@@ -1,6 +1,4 @@
-using ResIL.Unmanaged;
-using ResILWrapper.V8U8Stuff;
-using ResILWrapper.V8U8Stuff.AmaroK86Stuff;
+﻿using ResIL.Unmanaged;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -18,7 +16,7 @@ namespace ResILWrapper
     /// <summary>
     /// Provides object-oriented/C# way of interacting with ResIL images.
     /// </summary>
-    public class ResILImage : IDisposable
+    public class ResILImage : ResILImageBase
     {
         public static List<string> ValidFormats { get; private set; }
         public static List<string> DDSFormats { get; private set; }
@@ -308,7 +306,6 @@ namespace ResILWrapper
             else
             {
                 Debug.WriteLine("To Array failed for some reason.");
-                Debug.WriteLine(GetResILError());
             }
             return null;
         }
@@ -403,6 +400,13 @@ namespace ResILWrapper
             return success;
         }
 
+        private int EstimateNumMips()
+        {
+            int determiningDimension = Height > Width ? Width : Height;   // KFreon: Get smallest dimension
+
+            return (int)Math.Log(determiningDimension, 2) + 1;
+        }
+
         public bool RemoveMipmaps(bool forceRemoval = false)
         {
             bool success = false;
@@ -455,13 +459,9 @@ namespace ResILWrapper
             if (!mipsOperationSuccess)
                 Console.WriteLine("Failed to build mips for {0}", savePath);
 
-            if (surface == CompressedDataFormat.V8U8)
-                return WriteV8U8(V8U8Mips, savePath, Height, Width, Mips);
-            else
-            {
             ChangeSurface(type, surface);
             return IL2.SaveImage(handle, savePath, type);
-        }
+        
         }
 
 
@@ -498,13 +498,9 @@ namespace ResILWrapper
             if (!mipsOperationSuccess)
                 Console.WriteLine("Failed to build mips for image.");
 
-            if (surface == CompressedDataFormat.V8U8)
-                return WriteV8U8ToStream(V8U8Mips, stream, Width, Height, Mips, true);
-            else
-            {
             ChangeSurface(type, surface);
             return IL2.SaveImageAsStream(handle, type, stream);
-        }
+        
         }
 
         
@@ -512,7 +508,7 @@ namespace ResILWrapper
         /// Changes DDS surface format to specified format.
         /// </summary>
         /// <param name="type">Type of image. Anything other than DDS will be ignored.</param>
-        /// <param name="suface">Desired DDS surface format.</param>
+        /// <param name="surface">Desired DDS surface format.</param>
         private void ChangeSurface(ImageType type, CompressedDataFormat surface)
         {
             // KFreon: Change surface format of DDS's
@@ -530,7 +526,9 @@ namespace ResILWrapper
         /// <returns>True if success.</returns>
         public bool Resize(int width, int height)
         {
-            return ILU2.ResizeImage(handle, (uint)width, (uint)height, (byte)BitsPerPixel, (byte)Channels);
+            // KFreon: Broken for now
+            return false;
+            //return ILU2.ResizeImage(handle, (uint)width, (uint)height, (byte)BitsPerPixel, (byte)Channels);  
         }
         #endregion
 
