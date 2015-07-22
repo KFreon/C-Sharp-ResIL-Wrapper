@@ -1,3 +1,5 @@
+// KFreon: Almost all of this stuff is from DDSImage.cs from this project, and the original at http://code.google.com/p/kprojects/
+// And also from SaltIsGood's contributions to the ME3Explorer project. http://me3explorer.sourceforge.com
 public class V8U8Image : IResILImage
 {
 	/// <summary>
