@@ -47,7 +47,7 @@ namespace ResILWrapper
             get
             {
                 if (V8U8Mips != null)
-                    return V8U8Mips.Count();
+                    return V8U8Mips.Length;
                 else
                     return mips;
             }
@@ -761,31 +761,36 @@ namespace ResILWrapper
         /// <summary>
         /// Writes V8U8 image to file. Returns true if successful.
         /// </summary>
-        /// <param name="bytes">V8U8 data as List.</param>
+        /// <param name="mipmaps">V8U8 mips as List.</param>
         /// <param name="savepath">Path to save to.</param>
         /// <param name="height">Height of image.</param>
         /// <param name="width">Width of image.</param>
         /// <param name="Mips">Number of mips in image.</param>
-        private static bool WriteV8U8(List<sbyte> bytes, string savepath, int height, int width, int Mips)
+        private static bool WriteV8U8(IEnumerable<MipMap> mipmaps, string savepath, int height, int width, int Mips)
         {
-            DDS_HEADER header = Get_V8U8_DDS_Header(0, height, width);
-            
+            FileStream fs = new FileStream(savepath, FileMode.CreateNew);
+            return WriteV8U8ToStream(mipmaps, fs, width, height, Mips, false);
+        }
+
+        private static bool WriteV8U8ToStream(IEnumerable<MipMap> mipmaps, Stream destination, int width, int height, int Mips, bool DisposeStream)
+        {
+            DDS_HEADER header = Get_V8U8_DDS_Header(Mips, height, width);
+
             try
             {
-               using (FileStream fs = new FileStream(savepath, FileMode.CreateNew))
+                using (BinaryWriter writer = new BinaryWriter(destination, Encoding.Default, DisposeStream))
                 {
-                    using (BinaryWriter writer = new BinaryWriter(fs))
-                    {
-                        // KFreon: Get and write header
-                        Write_V8U8_DDS_Header(header, writer);
-    
-                        foreach (sbyte byt in bytes)
+                    // KFreon: Get and write header
+                    Write_V8U8_DDS_Header(header, writer);
+
+                    foreach (MipMap mip in mipmaps)
+                        foreach (sbyte byt in mip.data)
                             writer.Write(byt);
-                    }
-                } 
+                }
+                
                 return true;
             }
-            catch(IOException e)
+            catch (IOException e)
             {
                 Debug.WriteLine("Error writing to file: " + e.Message);
             }
@@ -815,54 +820,119 @@ namespace ResILWrapper
         }
         #endregion
 
+        private int EstimateNumMips()
+        {
+            int determiningDimension = Height > Width ? Width : Height;   // KFreon: Get smallest dimension
+
+            return (int)Math.Log(determiningDimension, 2) + 1;
+        }
+
         public bool BuildMipmaps(bool rebuild = false)
         {
+            bool success = false;
             if (!rebuild && Mips > 1)
                 return false;
             else if (SurfaceFormat == CompressedDataFormat.V8U8)
-                return BuildV8U8Mips();
+                success = BuildV8U8Mips();
             else
-                return ILU2.BuildMipmaps(handle);
+                success = ILU2.BuildMipmaps(handle);
+
+            Mips = EstimateNumMips();
+            return success;
         }
 
         public bool RemoveMipmaps(bool forceRemoval = false)
         {
+            bool success = false;
+
             if (!forceRemoval && Mips == 1)
                 return false;
             else if (SurfaceFormat == CompressedDataFormat.V8U8)
                 V8U8Mips = new MipMap[] {V8U8Mips[0] };   // KFreon: Take largest mipmap and ditch the rest
             else
-                return ILU2.RemoveMips(handle);
+                success = ILU2.RemoveMips(handle);
 
+            Mips = 1;
             return true;
+        }
+
+        public byte[] ResizeV8U8(byte[] data, int width, int height)
+        {
+            List<byte> nextMip = new List<byte>();
+
+            for (int h = 0; h < height; h++)
+            {
+                if (h % 2 != 0)
+                    continue;
+
+                for (int w = 0; w < width; w++)
+                {
+                    if (w % 2 != 0)
+                        continue;
+
+                    int heightOffset = (width * 2 * h) + (h == 0 ? 0 : 1);
+                    int widthOffset = 2 * w;
+                    int r = heightOffset + widthOffset;
+                    int b = heightOffset + widthOffset + 1;
+                    nextMip.Add(data[r]);
+                    nextMip.Add(data[b]);
+                }
+            }
+
+            return nextMip.ToArray();
         }
 
         private bool BuildV8U8Mips()
         {
             bool success = false;
             
-            int width = V8U8Mips[0].width / 2;
-            int height = V8U8Mips[0].height / 2;
+            MipMap LastMip = V8U8Mips.Last();
+
+            int width = LastMip.width;
+            int height = LastMip.height;
             
             Debug.WriteLine("Building V8U8 Mips with starting MIP size of {0} x {1}.", width, height);
-            
-            byte[] data = V8U8Mips[0].data;
+            List<MipMap> newMips = new List<MipMap>();
+            foreach (var mip in V8U8Mips)
+                newMips.Add(mip);
+
             try
             {
-                int count = 1;
+                
+                byte[] previousMipData = LastMip.data;
                 while (width > 1 && height > 1)
                 {
-                    using (ResILImage mipmap = new ResILImage(data))
+                    // KFreon: Need original height to resize. Original = previous, but initially it's the original height.
+                    byte[] newMipData = ResizeV8U8(previousMipData, width, height);
+
+                    // KFreon: Adjust to new dimensions for generating the new mipmap
+                    height /= 2;
+                    width /= 2;
+
+                    newMips.Add(new MipMap(newMipData, DDSFormat.V8U8, width, height));
+
+                    previousMipData = newMipData;
+                }
+
+                /*int count = 1;
+                while (width > 1 && height > 1)
+                {
+                    using (ResILImage mipmap = new ResILImage(test))
                     {
-                        mipmap.Resize(width, height);  // Note integer division - need to round somewhere
-                        byte[] tempdata = mipmap.ToArray(ImageType.Png);  // KFreon: Just RGB stuff. Gets read back in and dealt with accordingly (I hope...)
-                        data = tempdata;
-                        V8U8Mips[count++] = new MipMap(tempdata, DDSFormat.V8U8, width, height);
+                        if (!mipmap.Resize(width, height))  // Note integer division - need to round somewhere
+                            throw new Exception(String.Format("Mipmap resize failed at {0}x{1}", width, height));
+                        byte[] tempdata = mipmap.ToArray(ImageType.Bmp);  // KFreon: Just RGB stuff. Gets read back in and dealt with accordingly (I hope...)
+
+
+                        //data = tempdata;
+                        V8U8Mips[count++] = new MipMap(testing.ToArray(), DDSFormat.V8U8, width, height);
                     }
                     
                     height = (int)(height / 2);
                     width = (int)(width / 2);   
-                }
+                }*/
+
+                V8U8Mips = newMips.ToArray();
 
                 success = true;
             }
@@ -892,7 +962,7 @@ namespace ResILWrapper
             if (SetJPGQuality && type == ImageType.Jpg)
                 ResIL.Settings.SetJPGQuality(quality);
 
-            bool mipsOperationSuccess = false;
+            bool mipsOperationSuccess = true;
             switch (MipsMode)
             {
                 case MipMapMode.BuildAll:
@@ -907,16 +977,18 @@ namespace ResILWrapper
                 case MipMapMode.ForceRemove:
                     mipsOperationSuccess = RemoveMipmaps(true);
                     break;
-                case MipMapMode.None:
-                    break;
             }
 
             if (!mipsOperationSuccess)
                 Console.WriteLine("Failed to build mips for {0}", savePath);
 
-            ChangeSurface(type, surface);
-
-            return IL2.SaveImage(handle, savePath, type);
+            if (surface == CompressedDataFormat.V8U8)
+                return WriteV8U8(V8U8Mips, savePath, Height, Width, Mips);
+            else
+            {
+                ChangeSurface(type, surface);
+                return IL2.SaveImage(handle, savePath, type);
+            }
         }
 
 
@@ -924,7 +996,7 @@ namespace ResILWrapper
         /// Converts image to different types and saves to stream. Returns true if successful.
         /// </summary>
         /// <param name="type">Desired image type.</param>
-        /// <param name="stream">Data of image file, NOT raw pixel data.</param>
+        /// <param name="stream">Stream to save to. Contains data of image file, NOT raw pixel data.</param>
         /// <param name="surface">Surface format. ONLY valid when type is DDS.</param>
         /// <param name="quality">JPG quality. ONLY valid when tpye is JPG.</param>
         /// <param name="SetJPGQuality">Sets JPG output quality if true.</param>
@@ -933,7 +1005,7 @@ namespace ResILWrapper
             if (SetJPGQuality && type == ImageType.Jpg)
                 ResIL.Settings.SetJPGQuality(quality);
 
-            bool mipsOperationSuccess = false;
+            bool mipsOperationSuccess = true;
             switch (MipsMode)
             {
                 case MipMapMode.BuildAll:
@@ -953,9 +1025,13 @@ namespace ResILWrapper
             if (!mipsOperationSuccess)
                 Console.WriteLine("Failed to build mips for image.");
 
-            ChangeSurface(type, surface);
-
-            return IL2.SaveImageAsStream(handle, type, stream);
+            if (surface == CompressedDataFormat.V8U8)
+                return WriteV8U8ToStream(V8U8Mips, stream, Width, Height, Mips, true);
+            else
+            {
+                ChangeSurface(type, surface);
+                return IL2.SaveImageAsStream(handle, type, stream);
+            }
         }
 
         
@@ -984,7 +1060,8 @@ namespace ResILWrapper
             bool success = false;
             if (SurfaceFormat ==  CompressedDataFormat.V8U8)
             {
-                if ((width / height == Width / Height))
+                bool correctAspect = (width / height == Width / Height);
+                if (correctAspect && Mips > 1)
                 {
                     List<MipMap> newmips = new List<MipMap>();
                     foreach(MipMap mip in V8U8Mips)
@@ -995,12 +1072,28 @@ namespace ResILWrapper
                 }
                 else
                 {
-                    success = ILU2.ResizeImage(handle, (uint)width, (uint)height, (byte)BitsPerPixel, (byte)Channels);
-                    BuildMipmaps();
+                    success = IL2.ResizeImage(handle, (uint)width, (uint)height, (byte)BitsPerPixel, (byte)Channels);
+                    
+                    // KFreon: Rebuild mips for when aspect ratio changes, OTHERWISE DON't - it's already building them. That's why it's in here.
+                    if (Mips > 1)
+                        BuildMipmaps();
+                    else
+                    {
+                        // KFreon: Update V8U8 mips
+                        byte[] data = null;
+                        IL2.SaveToArray(handle, ImageType.Bmp, out data);
+
+
+                        V8U8Mips[0].data = data;
+                        V8U8Mips[0].width = width;
+                        V8U8Mips[0].height = height;
+
+                        PopulateInfo();
+                    }
                 }
             }
             else
-                success = ILU2.ResizeImage(handle, (uint)width, (uint)height, (byte)BitsPerPixel, (byte)Channels);
+                success = IL2.ResizeImage(handle, (uint)width, (uint)height, (byte)BitsPerPixel, (byte)Channels);
                 
             return success;
         }

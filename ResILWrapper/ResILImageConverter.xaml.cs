@@ -25,9 +25,15 @@ namespace ResILWrapper
     {
         ViewModel vm = null;
         public ResILImageConverter()
+            : this(null)
+        {
+
+        }
+
+        public ResILImageConverter(string filename)
         {
             InitializeComponent();
-            vm = new ViewModel();
+            vm = new ViewModel(filename);
             DataContext = vm;
         }
 

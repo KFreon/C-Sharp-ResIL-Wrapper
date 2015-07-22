@@ -370,7 +370,28 @@ namespace ResIL.Unmanaged
         #endregion
 
 
+
+        /// <summary>
+        /// Resizes image in ResIL. Permenant in memory. Disk is unchanged.
+        /// </summary>
+        /// <param name="handle">Pointer to current image.</param>
+        /// <param name="width">Width of image.</param>
+        /// <param name="height">Height of image.</param>
+        /// <param name="bpp">Bits per pixel of current image.</param>
+        /// <param name="bpc">Bits per channel of current image.</param>
+        /// <returns>True if success.</returns>
+        public static bool ResizeImage(IntPtr handle, uint width, uint height, byte bpp, byte bpc)
+        {
+            return il2ResizeImage(handle, width, height, 1, bpp, bpc);
+        }
+
+
+
         #region IL2 Native Methods
+        [DllImport(IL2DLL, EntryPoint = "il2ResizeImage")]
+        private static extern bool il2ResizeImage(IntPtr img, uint width, uint height, uint depth, byte bpp, byte bpc);
+
+
         // KFreon: Don't know why ordinal is required here, but name is not found...
         [DllImport(IL2DLL, EntryPoint="il2DetermineTypeL")]
         private static extern uint il2DetermineTypeL(byte[] lump, uint size);

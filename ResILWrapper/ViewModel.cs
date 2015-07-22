@@ -178,13 +178,16 @@ namespace ResILWrapper
             }
         }
 
-        public ViewModel(ResILImage im) : this()
+        public ViewModel(ResILImage im) : this("")
         {
             img = im;
         }
 
-        public ViewModel()
+        public ViewModel(string filename)
         {
+            if (!String.IsNullOrEmpty(filename))
+                LoadImage(filename);
+
             Formats = new List<string>(ResILImage.ValidFormats);
             Status = "Ready.";
         }

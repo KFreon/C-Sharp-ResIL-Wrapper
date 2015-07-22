@@ -10,20 +10,6 @@ namespace ResIL.Unmanaged
     public static class ILU2
     {
         const string ILU2DLL = "ILU.dll";
-        /// <summary>
-        /// Resizes image in ResIL. Permenant in memory. Disk is unchanged.
-        /// </summary>
-        /// <param name="handle">Pointer to current image.</param>
-        /// <param name="width">Width of image.</param>
-        /// <param name="height">Height of image.</param>
-        /// <param name="bpp">Bits per pixel of current image.</param>
-        /// <param name="bpc">Bits per channel of current image.</param>
-        /// <returns>True if success.</returns>
-        public static bool ResizeImage(IntPtr handle, uint width, uint height, byte bpp, byte bpc)
-        {
-            return il2ResizeImage(handle, width, height, 1, bpp, bpc);
-        }
-
 
         public static bool BuildMipmaps(IntPtr handle)
         {
@@ -35,10 +21,6 @@ namespace ResIL.Unmanaged
         {
             return ilu2DestroyMipmaps(handle);
         }
-
-
-        [DllImport(ILU2DLL, EntryPoint = "il2ResizeImage")]
-        private static extern bool il2ResizeImage(IntPtr img, uint width, uint height, uint depth, byte bpp, byte bpc);
 
         [DllImport(ILU2DLL, EntryPoint = "ilu2BuildMipmaps")]
         private static extern bool ilu2BuildMipmaps(IntPtr img);
