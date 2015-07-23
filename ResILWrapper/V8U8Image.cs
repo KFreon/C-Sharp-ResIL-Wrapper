@@ -1,3 +1,18 @@
+using ResIL.Unmanaged;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using UsefulThings;
+
+
+
 // KFreon: Almost all of this stuff is from DDSImage.cs from this project, and the original at http://code.google.com/p/kprojects/
 // And also from SaltIsGood's contributions to the ME3Explorer project. http://me3explorer.sourceforge.com
 public class V8U8Image : ResILImageBase
