@@ -60,10 +60,12 @@ namespace ResILWrapper
             PopulateInfo();
         }
 
-        public ResILImage(MemoryTributary stream)
+        public ResILImage(Stream stream)
         {
             Path = null;
-            imgType = DetermineType(ImageType.Unknown, stream.ToArray());
+            stream.Seek(0, SeekOrigin.Begin);
+            imgType = DetermineType(ImageType.Unknown, stream.ReadStreamFully());
+            stream.Seek(0, SeekOrigin.Begin);
             LoadImage(stream);
             PopulateInfo();
         }
@@ -257,9 +259,9 @@ namespace ResILWrapper
         /// Load image from MemoryStream. Returns true if successful.
         /// </summary>
         /// <param name="data">Data of image file, NOT raw pixel data.</param>asf
-        private bool LoadImage(MemoryTributary data)
+        private bool LoadImage(Stream data)
         {
-                IL2.Settings.KeepDXTC(true);
+            IL2.Settings.KeepDXTC(true);
             return IL2.LoadImageFromStream(ref handle, data);
         }
 
@@ -268,7 +270,7 @@ namespace ResILWrapper
         /// </summary>
         /// <param name="type">Type of image to create.</param>
         /// <param name="quality">Quality of JPG image. Valid only if type is JPG. Range 0-100.</param>
-        public BitmapImage ToImage(ImageType type = ImageType.Jpg, int quality = 80, int width = 0, int height = 0)
+        public override BitmapImage ToImage(ImageType type = ImageType.Jpg, int quality = 80, int width = 0, int height = 0)
         {
             byte[] data = null;
 
@@ -292,16 +294,12 @@ namespace ResILWrapper
         /// Converts instance to array of image data of a given image type.
         /// </summary>
         /// <param name="type">Type of image to get data of.</param>
-        public byte[] ToArray(ImageType type, int jpgQuality = 80)
+        public override byte[] ToArray()
         {
             byte[] data = null;
 
-            // KFreon: Set JPG quality if necessary
-            if (type == ImageType.Jpg)
-                ResIL.Settings.SetJPGQuality(jpgQuality);
-
-
-            if (IL2.SaveToArray(handle, type, out data) != 0)
+            Debugger.Break(); // KFreon: Check that imgtype is working as expected
+            if (IL2.SaveToArray(handle, imgType, out data) != 0)
                 return data;
             else
             {
@@ -388,7 +386,7 @@ namespace ResILWrapper
         #endregion
 
 
-        public bool BuildMipmaps(bool rebuild = false)
+        public override bool BuildMipMaps(bool rebuild = false)
         {
             bool success = false;
             if (!rebuild && Mips > 1)
@@ -396,18 +394,11 @@ namespace ResILWrapper
             else
                 success = ILU2.BuildMipmaps(handle);
 
-            Mips = EstimateNumMips();
+            Mips = EstimateNumMips(Width, Height);
             return success;
         }
 
-        private int EstimateNumMips()
-        {
-            int determiningDimension = Height > Width ? Width : Height;   // KFreon: Get smallest dimension
-
-            return (int)Math.Log(determiningDimension, 2) + 1;
-        }
-
-        public bool RemoveMipmaps(bool forceRemoval = false)
+        public override bool RemoveMipMaps(bool forceRemoval = false)
         {
             bool success = false;
 
@@ -422,11 +413,6 @@ namespace ResILWrapper
 
 
         #region Manipulation
-        public enum MipMapMode
-        {
-            BuildAll, RemoveAllButOne, Rebuild, ForceRemove, None
-        }
-
         /// <summary>
         /// Convert image to different types and save to path. Returns true if successful.
         /// </summary>
@@ -434,7 +420,7 @@ namespace ResILWrapper
         /// <param name="savePath">Path to save to.</param>
         /// <param name="surface">DDS Surface format to change to. Valid only if type is DDS.</param>
         /// <returns>True if success.</returns>
-        public bool ConvertAndSave(ImageType type, string savePath, MipMapMode MipsMode = MipMapMode.None, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
+        public override bool ConvertAndSave(ImageType type, string savePath, MipMapMode MipsMode = MipMapMode.None, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
         {
             if (SetJPGQuality && type == ImageType.Jpg)
                 ResIL.Settings.SetJPGQuality(quality);
@@ -443,16 +429,16 @@ namespace ResILWrapper
             switch (MipsMode)
             {
                 case MipMapMode.BuildAll:
-                    mipsOperationSuccess = BuildMipmaps();
+                    mipsOperationSuccess = BuildMipMaps();
                     break;
                 case MipMapMode.Rebuild:
-                    mipsOperationSuccess = BuildMipmaps(true);
+                    mipsOperationSuccess = BuildMipMaps(true);
                     break;
                 case MipMapMode.RemoveAllButOne:
-                    mipsOperationSuccess = RemoveMipmaps();
+                    mipsOperationSuccess = RemoveMipMaps();
                     break;
                 case MipMapMode.ForceRemove:
-                    mipsOperationSuccess = RemoveMipmaps(true);
+                    mipsOperationSuccess = RemoveMipMaps(true);
                     break;
             }
 
@@ -473,7 +459,7 @@ namespace ResILWrapper
         /// <param name="surface">Surface format. ONLY valid when type is DDS.</param>
         /// <param name="quality">JPG quality. ONLY valid when tpye is JPG.</param>
         /// <param name="SetJPGQuality">Sets JPG output quality if true.</param>
-        public bool ConvertAndSave(ImageType type, MemoryTributary stream, MipMapMode MipsMode = MipMapMode.None, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
+        public override bool ConvertAndSave(ImageType type, Stream stream, MipMapMode MipsMode = MipMapMode.None, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
         {
             if (SetJPGQuality && type == ImageType.Jpg)
                 ResIL.Settings.SetJPGQuality(quality);
@@ -482,16 +468,16 @@ namespace ResILWrapper
             switch (MipsMode)
             {
                 case MipMapMode.BuildAll:
-                    mipsOperationSuccess = BuildMipmaps();
+                    mipsOperationSuccess = BuildMipMaps();
                     break;
                 case MipMapMode.Rebuild:
-                    mipsOperationSuccess = BuildMipmaps(true);
+                    mipsOperationSuccess = BuildMipMaps(true);
                     break;
                 case MipMapMode.RemoveAllButOne:
-                    mipsOperationSuccess = RemoveMipmaps();
+                    mipsOperationSuccess = RemoveMipMaps();
                     break;
                 case MipMapMode.ForceRemove:
-                    mipsOperationSuccess = RemoveMipmaps(true);
+                    mipsOperationSuccess = RemoveMipMaps(true);
                     break;
             }
 
@@ -500,7 +486,6 @@ namespace ResILWrapper
 
             ChangeSurface(type, surface);
             return IL2.SaveImageAsStream(handle, type, stream);
-        
         }
 
         
@@ -524,10 +509,10 @@ namespace ResILWrapper
         /// <param name="width">Width of image.</param>
         /// <param name="height">Height of image.</param>
         /// <returns>True if success.</returns>
-        public bool Resize(int width, int height)
+        public override bool Resize(int width, int height)
         {
             // KFreon: Broken for now
-            return false;
+            throw new NotImplementedException();
             //return ILU2.ResizeImage(handle, (uint)width, (uint)height, (byte)BitsPerPixel, (byte)Channels);  
         }
         #endregion
