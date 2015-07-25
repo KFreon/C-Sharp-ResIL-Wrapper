@@ -25,6 +25,7 @@ namespace ResILWrapper
         public int Width { get; private set; }
         public int Height { get; private set; }
         public int Mips { get; private set; }
+        public ImageType ImageType { get; set; }
 
         public abstract BitmapImage ToImage(ImageType type = ImageType.Jpg, int quality = 80, int width = 0, int height = 0);
         public abstract byte[] ToArray();

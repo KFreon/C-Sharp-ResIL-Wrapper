@@ -73,6 +73,39 @@ namespace ResILWrapper
 		    using (MemoryTributary stream = new MemoryTributary(imgData))
 			    LoadImage(stream);
 	    }
+
+        public V8U8Image(byte[] rawPixelData, int width, int height, int numSourceChannels)
+        {
+            Path = null;
+            if (numSourceChannels < 2)
+                throw new ArgumentException("Source rawPixelData must have at least 2 channels.");
+
+            Width = width;
+            Height = height;
+            MipMaps = new MipMap[1];
+            MipMap mip = null;
+
+            if (numSourceChannels == 2)
+                mip = new MipMap(rawPixelData, width, height);
+            else
+            {
+                List<byte> formattedPixelData = new List<byte>();
+                int ptr = 0;
+
+                while (ptr < rawPixelData.Length)
+                {
+                    // KFreon: Read single pixel
+                    formattedPixelData.Add(rawPixelData[ptr++]);
+                    formattedPixelData.Add(rawPixelData[ptr++]);
+
+                    // KFreon: Skip unneeded channels
+                    ptr += numSourceChannels - 2;
+                }
+                mip = new MipMap(formattedPixelData.ToArray(), width, height);
+            }
+
+            MipMaps[0] = mip;
+        }
 	
 	    private void LoadImage(Stream stream)
 	    {		
@@ -159,23 +192,26 @@ namespace ResILWrapper
         {
             List<byte> nextMip = new List<byte>();
 
-            // KFreon: Build single mipmap of 
+            // KFreon: Build single mipmap
+            int ptr = 0;
             for (int h = 0; h < height; h++)
             {
                 if (h % scaleMultiplier != 0)
+                {
+                    ptr += width * 2; // KFreon: Skip entire row
                     continue;
+                }
 
                 for (int w = 0; w < width; w++)
                 {
                     if (w % scaleMultiplier != 0)
+                    {
+                        ptr += 2; // KFreon: Skip pixel
                         continue;
+                    }
 
-                    int heightOffset = (width * scaleMultiplier * h) + (h == 0 ? 0 : 1);
-                    int widthOffset = scaleMultiplier * w;
-                    int r = heightOffset + widthOffset;
-                    int b = heightOffset + widthOffset + 1;
-                    nextMip.Add(data[r]);
-                    nextMip.Add(data[b]);
+                    nextMip.Add(data[ptr++]);
+                    nextMip.Add(data[ptr++]);
                 }
             }
 

@@ -43,8 +43,6 @@ namespace ResILWrapper
         }
         #endregion
 
-        public ImageType imgType { get; set; }
-
         static ResILImage()
         {
             string[] types = Enum.GetNames(typeof(ResIL.Unmanaged.ImageType));
@@ -55,7 +53,7 @@ namespace ResILWrapper
         public ResILImage(string FilePath)
         {
             Path = FilePath;
-            imgType = DetermineType(ImageType.Unknown, UsefulThings.General.GetExternalData(FilePath));
+            ImageType = DetermineType(ImageType.Unknown, UsefulThings.General.GetExternalData(FilePath));
             LoadImage(FilePath);
             PopulateInfo();
         }
@@ -64,7 +62,7 @@ namespace ResILWrapper
         {
             Path = null;
             stream.Seek(0, SeekOrigin.Begin);
-            imgType = DetermineType(ImageType.Unknown, stream.ReadStreamFully());
+            ImageType = DetermineType(ImageType.Unknown, stream.ReadStreamFully());
             stream.Seek(0, SeekOrigin.Begin);
             LoadImage(stream);
             PopulateInfo();
@@ -73,8 +71,8 @@ namespace ResILWrapper
         public ResILImage(byte[] imgData, ImageType type = ImageType.Bmp)
         {
             Path = null;
-            imgType = DetermineType(type, imgData);
-            LoadImage(imgData, imgType);
+            ImageType = DetermineType(type, imgData);
+            LoadImage(imgData, ImageType);
             PopulateInfo();
         }
 
@@ -298,8 +296,8 @@ namespace ResILWrapper
         {
             byte[] data = null;
 
-            Debugger.Break(); // KFreon: Check that imgtype is working as expected
-            if (IL2.SaveToArray(handle, imgType, out data) != 0)
+            Debugger.Break(); // KFreon: Check that ImageType is working as expected
+            if (IL2.SaveToArray(handle, ImageType, out data) != 0)
                 return data;
             else
             {
@@ -422,7 +420,7 @@ namespace ResILWrapper
         /// <returns>True if success.</returns>
         public override bool ConvertAndSave(ImageType type, string savePath, MipMapMode MipsMode = MipMapMode.None, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true)
         {
-            if (SetJPGQuality && type == ImageType.Jpg)
+            /*if (SetJPGQuality && type == ImageType.Jpg)
                 ResIL.Settings.SetJPGQuality(quality);
 
             bool mipsOperationSuccess = true;
@@ -446,8 +444,10 @@ namespace ResILWrapper
                 Console.WriteLine("Failed to build mips for {0}", savePath);
 
             ChangeSurface(type, surface);
-            return IL2.SaveImage(handle, savePath, type);
-        
+            return IL2.SaveImage(handle, savePath, type);*/
+
+            using (FileStream fs = new FileStream(savePath, FileMode.CreateNew))
+                return ConvertAndSave(type, fs, MipsMode, surface, quality, SetJPGQuality);
         }
 
 
@@ -484,20 +484,29 @@ namespace ResILWrapper
             if (!mipsOperationSuccess)
                 Console.WriteLine("Failed to build mips for image.");
 
-            ChangeSurface(type, surface);
-            return IL2.SaveImageAsStream(handle, type, stream);
+            if (surface == CompressedDataFormat.V8U8)
+            {
+                byte[] imgdata = ToArray();
+
+                using (V8U8Image img = new V8U8Image(imgdata))
+                    return img.ConvertAndSave(type, stream, MipsMode, surface, quality, SetJPGQuality);
+            }
+            else
+            {
+                ChangeSurface(surface);
+                return IL2.SaveImageAsStream(handle, type, stream);
+            }
         }
 
         
         /// <summary>
         /// Changes DDS surface format to specified format.
         /// </summary>
-        /// <param name="type">Type of image. Anything other than DDS will be ignored.</param>
         /// <param name="surface">Desired DDS surface format.</param>
-        private void ChangeSurface(ImageType type, CompressedDataFormat surface)
+        private void ChangeSurface(CompressedDataFormat surface)
         {
             // KFreon: Change surface format of DDS's
-            if (type == ImageType.Dds && surface != CompressedDataFormat.None)
+            if (surface != CompressedDataFormat.None)
                 IL2.Settings.SetDXTcFormat(surface);
         }
 
