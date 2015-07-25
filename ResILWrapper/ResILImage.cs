@@ -488,7 +488,16 @@ namespace ResILWrapper
             {
                 byte[] imgdata = ToArray();
 
-                using (V8U8Image img = new V8U8Image(imgdata))
+                Debugger.Break(); // KFreon: Check number of channels
+                byte[] rawdata = null;
+                using (MemoryTributary test = new MemoryTributary(imgdata))
+                {
+                    var frame = BitmapFrame.Create(test);
+                    int stride = 4 * (Width * BitsPerPixel + 31) / 32;
+                    frame.CopyPixels(rawdata, stride, 0);
+                }
+                
+                using (V8U8Image img = new V8U8Image(rawdata, Width, Height, Channels))
                     return img.ConvertAndSave(type, stream, MipsMode, surface, quality, SetJPGQuality);
             }
             else
