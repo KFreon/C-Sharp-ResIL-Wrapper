@@ -52,31 +52,39 @@ namespace ResILWrapper
 	    }
 	    MipMap[] MipMaps;
 	
+        private V8U8Image()
+        {
+            SurfaceFormat = CompressedDataFormat.V8U8;
+            Path = null;
+        }
 
 
-	    public V8U8Image(string FilePath)
+        public V8U8Image(string FilePath) 
+            : this()
 	    {
 		    Path = FilePath;
 		    using (FileStream stream = new FileStream(Path, FileMode.Open))
 			    LoadImage(stream);
 	    }
 	
-	    public V8U8Image(Stream stream)
+	    public V8U8Image(Stream stream) : this()
 	    {
-		    Path = null;
 		    LoadImage(stream);
 	    }
 	
-	    public V8U8Image(byte[] imgData)
+	    public V8U8Image(byte[] imgData) : this()
 	    {
-		    Path = null;
 		    using (MemoryTributary stream = new MemoryTributary(imgData))
 			    LoadImage(stream);
 	    }
 
-        public V8U8Image(byte[] rawPixelData, int width, int height, int numSourceChannels)
+        public V8U8Image(byte[] rawPixelData, int width, int height, int numSourceChannels) : this()
         {
-            Path = null;
+            LoadRawPixels(rawPixelData, width,height, numSourceChannels);
+        }
+
+        private void LoadRawPixels(byte[] rawPixelData, int width, int height, int numSourceChannels)
+        {
             if (numSourceChannels < 2)
                 throw new ArgumentException("Source rawPixelData must have at least 2 channels.");
 
@@ -123,7 +131,6 @@ namespace ResILWrapper
                 throw new Exception("DX10 not supported yet!");
             }
 		
-            Debugger.Break(); // KFreon: Check that V8U8 fourcc is set - figure out what it is
 		    if (header.ddspf.dwFourCC != 0)
 			    throw new InvalidDataException("DDS not V8U8.");
 
@@ -422,14 +429,21 @@ namespace ResILWrapper
             if (surface != SurfaceFormat)
             {
                 byte[] RawImageData = GetImageDataAs3Channel(); // KFreon: Get image data as raw rgb pixels
-                using (ResILImage img = new ResILImage(RawImageData))
+                int stride = (Width * 32 + 7) / 8;
+                BitmapSource test = BitmapSource.Create(Width, Height, 96, 96, PixelFormats.Bgr32, BitmapPalettes.Halftone125, RawImageData, stride);
+
+                MemoryTributary stream2 = new MemoryTributary();
+                JpegBitmapEncoder encoder = new JpegBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(test));
+                encoder.Save(stream2);
+
+                using (ResILImage img = new ResILImage(stream2))
                     return img.ConvertAndSave(type, stream, MipsMode, surface, quality, SetJPGQuality);
             }
             else
             {
                 // KFreon: Deal with mips first
                 int expectedMips = EstimateNumMips(Width, Height);
-                Debugger.Break(); // KFreon: Check that estimation is correct
                 bool success = true;
                 switch (MipsMode)
                 {

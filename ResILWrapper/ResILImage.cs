@@ -18,9 +18,6 @@ namespace ResILWrapper
     /// </summary>
     public class ResILImage : ResILImageBase
     {
-        public static List<string> ValidFormats { get; private set; }
-        public static List<string> DDSFormats { get; private set; }
-
         #region Image Properties
         public string Path { get; private set; }
         public CompressedDataFormat SurfaceFormat { get; private set; }
@@ -42,13 +39,6 @@ namespace ResILWrapper
             }
         }
         #endregion
-
-        static ResILImage()
-        {
-            string[] types = Enum.GetNames(typeof(ResIL.Unmanaged.ImageType));
-            DDSFormats = new List<string>() { "None", "DXT1", "DXT2", "DXT3", "DXT4", "DXT5", "3Dc/ATI2", "RXGB", "ATI1N/BC4", "DXT1A", "G8", "ARGB" }; // KFreon: DDS Surface formats
-            ValidFormats = new List<string>(types.Where(t => t != "Dds" && t != "Unknown")).Concat(DDSFormats).ToList(30);  // KFreon: Remove DDS from types list
-        }
 
         public ResILImage(string FilePath)
         {
@@ -291,12 +281,11 @@ namespace ResILWrapper
         /// <summary>
         /// Converts instance to array of image data of a given image type.
         /// </summary>
-        /// <param name="type">Type of image to get data of.</param>
         public override byte[] ToArray()
         {
             byte[] data = null;
 
-            Debugger.Break(); // KFreon: Check that ImageType is working as expected
+            ChangeSurface(SurfaceFormat);
             if (IL2.SaveToArray(handle, ImageType, out data) != 0)
                 return data;
             else
@@ -347,6 +336,11 @@ namespace ResILWrapper
         /// <returns>True if valid.</returns>
         public static bool isValidFormat(string format)
         {
+            // KFreon: V8U8 not valid for this class. Use V8U8Image instead.
+            if (format.Contains("V8U8", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+
             return ValidFormats.Contains(format.ToUpperInvariant());
         }
 
@@ -388,7 +382,7 @@ namespace ResILWrapper
         {
             bool success = false;
             if (!rebuild && Mips > 1)
-                return false;
+                return true;
             else
                 success = ILU2.BuildMipmaps(handle);
 
@@ -443,7 +437,8 @@ namespace ResILWrapper
             if (!mipsOperationSuccess)
                 Console.WriteLine("Failed to build mips for {0}", savePath);
 
-            ChangeSurface(type, surface);
+            ChangeSurface(surface);
+            //IL2.SaveImage(handle, savePath + ".dds", type);
             return IL2.SaveImage(handle, savePath, type);*/
 
             using (FileStream fs = new FileStream(savePath, FileMode.CreateNew))
@@ -464,44 +459,50 @@ namespace ResILWrapper
             if (SetJPGQuality && type == ImageType.Jpg)
                 ResIL.Settings.SetJPGQuality(quality);
 
-            bool mipsOperationSuccess = true;
-            switch (MipsMode)
-            {
-                case MipMapMode.BuildAll:
-                    mipsOperationSuccess = BuildMipMaps();
-                    break;
-                case MipMapMode.Rebuild:
-                    mipsOperationSuccess = BuildMipMaps(true);
-                    break;
-                case MipMapMode.RemoveAllButOne:
-                    mipsOperationSuccess = RemoveMipMaps();
-                    break;
-                case MipMapMode.ForceRemove:
-                    mipsOperationSuccess = RemoveMipMaps(true);
-                    break;
-            }
-
-            if (!mipsOperationSuccess)
-                Console.WriteLine("Failed to build mips for image.");
-
             if (surface == CompressedDataFormat.V8U8)
             {
                 byte[] imgdata = ToArray();
 
-                Debugger.Break(); // KFreon: Check number of channels
+                if (imgdata == null)
+                    return false;
+
                 byte[] rawdata = null;
                 using (MemoryTributary test = new MemoryTributary(imgdata))
                 {
                     var frame = BitmapFrame.Create(test);
-                    int stride = 4 * (Width * BitsPerPixel + 31) / 32;
+                    int stride = (Width * 32 + 7) / 8;
+                    rawdata = new byte[stride * 1024];
                     frame.CopyPixels(rawdata, stride, 0);
                 }
-                
-                using (V8U8Image img = new V8U8Image(rawdata, Width, Height, Channels))
+
+                using (V8U8Image img = new V8U8Image(rawdata, Width, Height, BitsPerPixel))
+                {
                     return img.ConvertAndSave(type, stream, MipsMode, surface, quality, SetJPGQuality);
+                }
             }
             else
             {
+                bool mipsOperationSuccess = true;
+                switch (MipsMode)
+                {
+                    case MipMapMode.BuildAll:
+                        mipsOperationSuccess = BuildMipMaps();
+                        break;
+                    case MipMapMode.Rebuild:
+                        mipsOperationSuccess = BuildMipMaps(true);
+                        break;
+                    case MipMapMode.RemoveAllButOne:
+                        mipsOperationSuccess = RemoveMipMaps();
+                        break;
+                    case MipMapMode.ForceRemove:
+                        mipsOperationSuccess = RemoveMipMaps(true);
+                        break;
+                }
+
+                if (!mipsOperationSuccess)
+                    Console.WriteLine("Failed to build mips for image.");
+
+
                 ChangeSurface(surface);
                 return IL2.SaveImageAsStream(handle, type, stream);
             }

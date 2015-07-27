@@ -77,8 +77,8 @@ namespace ResILWrapper
         }
 
         // KFreon: Loaded image as loaded into ResIL
-        ResILImage im = null;
-        public ResILImage img
+        ResILImageBase im = null;
+        public ResILImageBase img
         {
             get
             {
@@ -178,7 +178,7 @@ namespace ResILWrapper
             }
         }
 
-        public ViewModel(ResILImage im) : this("")
+        public ViewModel(ResILImageBase im) : this("")
         {
             img = im;
         }
@@ -199,7 +199,7 @@ namespace ResILWrapper
         /// <param name="file">File to load.</param>
         public void LoadImage(string file)
         {
-            img = new ResILImage(file);
+            img = ResILImageBase.Create(file);
             Status = "Loaded.";
         }
 

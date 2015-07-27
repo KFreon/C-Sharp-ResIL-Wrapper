@@ -216,6 +216,7 @@ namespace ResIL.Unmanaged
         public static long SaveToArray(IntPtr handle, ImageType type, out byte[] lump)
         {
             long size = il2DetermineSize(handle, type);
+            //long size = 1398256;
             lump = new byte[size];
             return il2SaveL(handle, type, lump, (uint)size);
         }
@@ -263,58 +264,6 @@ namespace ResIL.Unmanaged
         public static bool SaveImage(IntPtr handle, string savePath, ImageType type)
         {
             return il2Save(handle, type, savePath);
-        }
-
-
-        /// <summary>
-        /// Gets V8U8 data. Needs to be separate from the other get data as V8U8 needs to be manually coloured. 
-        /// </summary>
-        /// <param name="img">Pointer to current image.</param>
-        /// <param name="Height">Height of image.</param>
-        /// <param name="Width">Width of image.</param>
-        /// <returns>List of bytes containing V8U8 data.</returns>
-        public static List<byte> GetV8U8Data(IntPtr img, int Height, int Width)
-        {
-            List<byte> bytes = new List<byte>();
-            using (MemoryTributary stream = new MemoryTributary())
-            {
-                bool success = SaveImageAsStream(img, ImageType.Bmp, stream);
-
-                // KFreon: Step over each pixel.
-                for (int h = 0; h < Height; h++)
-                {
-                    for (int w = 0; w < Width; w++)
-                    {
-                        // KFreon: Get data. NOTE not correct channel names. No idea what the actual names are cos alpha and blue are apparently either red or green.
-                        byte alpha = (byte)stream.ReadByte();
-                        byte red = (byte)stream.ReadByte();
-                        byte green = (byte)stream.ReadByte();
-                        byte blue = (byte)stream.ReadByte();
-
-                        // KFreon: Write data
-                        bytes.Add(alpha);
-                        bytes.Add(blue);
-                    }
-                }
-            }
-            return bytes;
-        }
-
-
-        /// <summary>
-        /// Gets V8U8 data as MemoryStream.
-        /// </summary>
-        /// <param name="img">Pointer to current image.</param>
-        /// <param name="Height">Height of image.</param>
-        /// <param name="Width">Width of image.</param>
-        /// <returns>MemoryStream containing V8U8 data.</returns>
-        public static MemoryStream GetV8U8DataAsStream(IntPtr img, int Height, int Width)
-        {
-            List<byte> data = GetV8U8Data(img, Height, Width);
-            MemoryStream stream = new MemoryStream(data.ToArray());
-            data.Clear();
-            data = null;
-            return stream;
         }
         #endregion
 

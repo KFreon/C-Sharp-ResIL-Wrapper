@@ -20,8 +20,11 @@ namespace ResILWrapper
             BuildAll, RemoveAllButOne, Rebuild, ForceRemove, None
         }
 
+        public static List<string> DDSFormats = new List<string>() { "None", "DXT1", "DXT2", "DXT3", "DXT4", "DXT5", "3Dc/ATI2", "RXGB", "ATI1N/BC4", "DXT1A", "G8", "ARGB", "V8U8" }; // KFreon: DDS Surface formats
+        public static List<string> ValidFormats = null;
+
         public string Path { get; private set; }
-        public CompressedDataFormat SurfaceFormat { get; private set; }
+        public CompressedDataFormat SurfaceFormat { get; protected set; }
         public int Width { get; private set; }
         public int Height { get; private set; }
         public int Mips { get; private set; }
@@ -40,6 +43,14 @@ namespace ResILWrapper
             int determiningDimension = Height > Width ? Width : Height;   // KFreon: Get smallest dimension
 
             return (int)Math.Log(determiningDimension, 2) + 1;
+        }
+
+
+
+        static ResILImageBase()
+        {
+            string[] types = Enum.GetNames(typeof(ResIL.Unmanaged.ImageType));
+            ValidFormats = new List<string>(types.Where(t => t != "Dds" && t != "Unknown")).Concat(DDSFormats).ToList(30);  // KFreon: Remove DDS from types list
         }
 
 
@@ -83,8 +94,11 @@ namespace ResILWrapper
 	            {
 	                throw new Exception("DX10 not supported yet!");
 	            }
-                Debugger.Break(); // KFreon: Returns true if dds is a V8U8, so fourcc?
-			    return header.ddspf.dwFourCC == 0;
+                return header.ddspf.dwRGBBitCount == 0x10 &&
+                           header.ddspf.dwRBitMask == 0xFF &&
+                           header.ddspf.dwGBitMask == 0xFF00 &&
+                           header.ddspf.dwBBitMask == 0x00 &&
+                           header.ddspf.dwABitMask == 0x00;
 		    }
 	    }
         #endregion Creation
