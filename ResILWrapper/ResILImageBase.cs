@@ -23,15 +23,16 @@ namespace ResILWrapper
         public static List<string> DDSFormats = new List<string>() { "None", "DXT1", "DXT2", "DXT3", "DXT4", "DXT5", "3Dc/ATI2", "RXGB", "ATI1N/BC4", "DXT1A", "G8", "ARGB", "V8U8" }; // KFreon: DDS Surface formats
         public static List<string> ValidFormats = null;
 
-        public string Path { get; private set; }
+        public string Path { get; protected set; }
         public CompressedDataFormat SurfaceFormat { get; protected set; }
-        public int Width { get; private set; }
-        public int Height { get; private set; }
-        public int Mips { get; private set; }
+        public int Width { get; protected set; }
+        public int Height { get; protected set; }
+        public int Mips { get; protected set; }
         public ImageType ImageType { get; set; }
 
         public abstract BitmapImage ToImage(ImageType type = ImageType.Jpg, int quality = 80, int width = 0, int height = 0);
         public abstract byte[] ToArray();
+        
         public abstract bool BuildMipMaps(bool rebuild = false);
         public abstract bool RemoveMipMaps(bool force = false);
         public abstract bool ConvertAndSave(ImageType type, string savePath, MipMapMode MipsMode = MipMapMode.BuildAll, CompressedDataFormat surface = CompressedDataFormat.None, int quality = 80, bool SetJPGQuality = true);
@@ -103,7 +104,21 @@ namespace ResILWrapper
 	    }
         #endregion Creation
 
+        public System.Drawing.Bitmap ToWinFormsBitmap(int width = 0, int height = 0)
+        {
+            JpegBitmapEncoder encoder = new JpegBitmapEncoder();
+            BitmapImage bmp = ToImage(width: width, height: height);
+            BitmapFrame frame = BitmapFrame.Create(bmp);
+            encoder.Frames.Add(frame);
 
+            using (MemoryTributary ms = new MemoryTributary())
+            {
+                encoder.Save(ms);
+                System.Drawing.Bitmap bitmap = new System.Drawing.Bitmap(ms);
+                return new System.Drawing.Bitmap(bitmap);
+            }
+
+        }
 
         #region DDS Header stuff
         /// <summary>

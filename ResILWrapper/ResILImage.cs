@@ -19,17 +19,12 @@ namespace ResILWrapper
     public class ResILImage : ResILImageBase
     {
         #region Image Properties
-        public string Path { get; private set; }
-        public CompressedDataFormat SurfaceFormat { get; private set; }
-        public int Width { get; private set; }
-        public int Height { get; private set; }
         public int BitsPerPixel { get; private set; }
         public DataFormat MemoryFormat { get; private set; }  // KFreon: Format as loaded by ResIL (Usually RGB)
         public int Channels { get; private set; }
         public int DataSize { get; private set; }
         public DataType DataType { get; private set; }
 
-        public int Mips{get;private set;}
         IntPtr handle = IL2.GenerateImage();
         public bool ValidHandle
         {
