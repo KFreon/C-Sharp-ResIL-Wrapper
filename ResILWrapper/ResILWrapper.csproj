@@ -5,7 +5,7 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{D112272B-35BF-4942-B3ED-8F606F3CB758}</ProjectGuid>
-    <OutputType>WinExe</OutputType>
+    <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>ResILWrapper</RootNamespace>
     <AssemblyName>ResILWrapper</AssemblyName>
@@ -24,7 +24,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>true</Prefer32Bit>
+    <Prefer32Bit>false</Prefer32Bit>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DocumentationFile>bin\Debug\ResILWrapper.XML</DocumentationFile>
   </PropertyGroup>
@@ -109,10 +109,10 @@
     <Compile Include="ResILImageBase.cs" />
     <Compile Include="V8U8Image.cs" />
     <Compile Include="ViewModel.cs" />
-    <ApplicationDefinition Include="App.xaml">
+    <None Include="App.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
-    </ApplicationDefinition>
+    </None>
     <Compile Include="ResILImageConverter.xaml.cs">
       <DependentUpon>ResILImageConverter.xaml</DependentUpon>
       <SubType>Code</SubType>
