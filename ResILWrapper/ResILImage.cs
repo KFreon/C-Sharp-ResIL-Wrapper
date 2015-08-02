@@ -294,7 +294,7 @@ namespace ResILWrapper
         #region Static methods
         public static bool IsTextureDDS(string format)
         {
-            return DDSFormats.Contains(t => t.Contains(format, StringComparison.CurrentCultureIgnoreCase));
+            return DDSFormats.Any(t => t.Contains(format, StringComparison.CurrentCultureIgnoreCase));
         }
 
 
